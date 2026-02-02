@@ -210,4 +210,7 @@ __marimo__/
 audio/processed/
 audio/speech/
 
+# macOS
+.DS_Store
+
 

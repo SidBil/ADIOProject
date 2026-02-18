@@ -1,0 +1,77 @@
+[
+  {
+    "model": "tiny",
+    "model_id": "openai/whisper-tiny",
+    "groups": {
+      "healthy": {
+        "wer": 0.4437039635215714,
+        "cer": 0.1793179317931793,
+        "substitutions": 1141,
+        "deletions": 22,
+        "insertions": 102,
+        "num_samples": 1098
+      },
+      "dysarthric": {
+        "wer": 1.538160469667319,
+        "cer": 1.5019505851755526,
+        "substitutions": 980,
+        "deletions": 60,
+        "insertions": 1318,
+        "num_samples": 558
+      }
+    },
+    "overall_wer": 0.8264142335766423,
+    "overall_cer": 0.6367725105693982,
+    "total_samples": 1656
+  },
+  {
+    "model": "base",
+    "model_id": "openai/whisper-base",
+    "groups": {
+      "healthy": {
+        "wer": 0.49456331111890567,
+        "cer": 0.26216996699669964,
+        "substitutions": 1121,
+        "deletions": 12,
+        "insertions": 277,
+        "num_samples": 1098
+      },
+      "dysarthric": {
+        "wer": 1.9249836921069798,
+        "cer": 1.6427828348504552,
+        "substitutions": 950,
+        "deletions": 51,
+        "insertions": 1950,
+        "num_samples": 558
+      }
+    },
+    "overall_wer": 0.9947536496350365,
+    "overall_cer": 0.739677970675542,
+    "total_samples": 1656
+  },
+  {
+    "model": "small",
+    "model_id": "openai/whisper-small",
+    "groups": {
+      "healthy": {
+        "wer": 0.350754121360926,
+        "cer": 0.11592409240924093,
+        "substitutions": 959,
+        "deletions": 11,
+        "insertions": 30,
+        "num_samples": 1098
+      },
+      "dysarthric": {
+        "wer": 1.1161121983039792,
+        "cer": 1.263068920676203,
+        "substitutions": 806,
+        "deletions": 95,
+        "insertions": 810,
+        "num_samples": 558
+      }
+    },
+    "overall_wer": 0.6183850364963503,
+    "overall_cer": 0.5126832778627327,
+    "total_samples": 1656
+  }
+]

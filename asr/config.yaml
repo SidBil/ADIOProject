@@ -1,0 +1,36 @@
+# ASR LoRA fine-tuning config (paths, model, LoRA, training)
+# Run notebook from project root so asr/config.yaml is found.
+
+model:
+  name: "openai/whisper-small"
+  language: "en"
+  task: "transcribe"
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["q_proj", "v_proj"]
+
+data:
+  # Path to dataset saved by audio/data_loader (load_from_disk); relative to project root
+  dataset_path: "audio/torgo/torgo_dataset"
+  sampling_rate: 16000
+  max_audio_length: 15.0
+
+output:
+  model_dir: "asr/checkpoints/whisper-lora"
+  log_dir: "asr/runs"
+
+training:
+  epochs: 3
+  batch_size: 1
+  learning_rate: 1.0e-5
+  warmup_steps: 100
+  fp16: false
+  eval_steps: 500
+  save_steps: 500
+  gradient_accumulation_steps: 16
+  metric_for_best_model: "eval_wer"
+  greater_is_better: false
+  early_stopping_patience: 3

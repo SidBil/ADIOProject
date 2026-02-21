@@ -210,6 +210,9 @@ __marimo__/
 audio/val_set/
 audio/torgo/
 
+# CLIP embedding cache (large binary files)
+multimodal/cache/
+
 # macOS
 .DS_Store
 

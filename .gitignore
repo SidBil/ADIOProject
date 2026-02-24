@@ -209,6 +209,7 @@ __marimo__/
 # Project audio
 audio/val_set/
 audio/torgo/
+audio/custom_speech/
 
 # CLIP embedding cache (large binary files)
 multimodal/cache/

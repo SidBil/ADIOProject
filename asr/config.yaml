@@ -9,27 +9,30 @@ model:
 lora:
   r: 16
   alpha: 32
-  dropout: 0.05
-  target_modules: ["q_proj", "v_proj"]
+  dropout: 0.1
+  target_modules: ["q_proj", "v_proj", "k_proj", "out_proj"]
 
 data:
-  # Path to dataset saved by audio/data_loader (load_from_disk); relative to project root
-  dataset_path: "audio/torgo/torgo_dataset"
+  processed_dir: "audio/torgo/processed"
+  metadata_path: "audio/torgo/processed/metadata.json"
   sampling_rate: 16000
   max_audio_length: 15.0
+  include_augmented: true
+  dysarthric_only: false
 
 output:
   model_dir: "asr/checkpoints/whisper-lora"
   log_dir: "asr/runs"
 
 training:
-  epochs: 3
+  epochs: 2
   batch_size: 1
-  learning_rate: 1.0e-5
-  warmup_steps: 100
+  learning_rate: 3.0e-4
+  warmup_steps: 50
   fp16: false
-  eval_steps: 500
-  save_steps: 500
+  eval_steps: 250
+  save_steps: 250
+  logging_steps: 25
   gradient_accumulation_steps: 16
   metric_for_best_model: "eval_wer"
   greater_is_better: false

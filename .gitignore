@@ -214,6 +214,9 @@ audio/custom_speech/
 # CLIP embedding cache (large binary files)
 multimodal/cache/
 
+# Fine-tuned model weights
+asr/whisper-lora-final/
+
 # macOS
 .DS_Store
 

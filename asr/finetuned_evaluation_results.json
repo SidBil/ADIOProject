@@ -1,0 +1,25 @@
+{
+  "model": "whisper-lora",
+  "model_id": "whisper-small + LoRA",
+  "groups": {
+    "healthy": {
+      "wer": 0.015438596491228071,
+      "cer": 0.0075648167251220685,
+      "substitutions": 39,
+      "deletions": 2,
+      "insertions": 3,
+      "num_samples": 1097
+    },
+    "dysarthria": {
+      "wer": 0.04044357469015003,
+      "cer": 0.023797139141742522,
+      "substitutions": 55,
+      "deletions": 2,
+      "insertions": 5,
+      "num_samples": 558
+    }
+  },
+  "overall_wer": 0.024184348619666896,
+  "overall_cer": 0.013179793981377357,
+  "total_samples": 1655
+}

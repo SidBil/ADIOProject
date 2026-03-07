@@ -216,6 +216,10 @@ multimodal/cache/
 
 # Fine-tuned model weights
 asr/whisper-lora-final/
+asr/finetuned-whsiper-lora/
+
+# Web app temp files
+web/static/audio/
 
 # macOS
 .DS_Store

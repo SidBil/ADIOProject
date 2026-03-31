@@ -1,10 +1,9 @@
 """
-LLM Service — GPT-4o integration for therapeutic scaffolding.
+LLM Service — GPT-4o integration for therapeutic evaluation and follow-ups.
 
-Provides three capabilities:
-1. Gold-standard description generation (V/V structure words)
-2. Therapeutic question scaffolding
-3. Response evaluation against gold standard
+Two capabilities:
+1. Evaluate a child's spoken response against the expected answer
+2. Generate a dynamic follow-up question when the child struggles (accuracy < 4)
 """
 
 import json
@@ -47,49 +46,7 @@ class LLMService:
         )
         return resp.choices[0].message.content
 
-    def generate_gold_standard(self, image_prompt: str, image_id: str) -> dict:
-        """Generate V/V structure-word description and scaffolded questions."""
-        system = """You are a speech-language pathologist creating therapy materials for
-children with Autism Spectrum Disorder. You use the Visualization and Verbalization (V/V)
-structure word framework to guide children in describing images.
-
-Return ONLY valid JSON with this exact schema:
-{
-  "description": "A detailed description of what the image shows",
-  "structure_words": {
-    "who": "...",
-    "what": "...",
-    "where": "...",
-    "color": "...",
-    "size": "...",
-    "shape": "...",
-    "mood": "...",
-    "movement": "..."
-  },
-  "questions": [
-    {
-      "id": 1,
-      "question": "...",
-      "structure_word": "who|what|where|color|size|shape|mood|movement",
-      "expected_answer": "...",
-      "difficulty": 1
-    }
-  ]
-}
-
-Generate 6-8 questions ordered from easiest (difficulty 1) to hardest (difficulty 3).
-Start with concrete, observable elements (who, what, where) and progress to abstract
-qualities (mood, movement). Use simple, encouraging language appropriate for children.
-Each expected_answer should be a short phrase (3-12 words)."""
-
-        user = f"""Generate a gold-standard V/V description and scaffolded questions for this therapy image:
-
-Image ID: {image_id}
-Scene description: {image_prompt}
-
-Remember: Return ONLY the JSON object, no markdown formatting."""
-
-        raw = self._call(system, user)
+    def _parse_json(self, raw: str) -> dict:
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
@@ -97,9 +54,9 @@ Remember: Return ONLY the JSON object, no markdown formatting."""
         return json.loads(raw)
 
     def evaluate_response(self, question: str, expected_answer: str,
-                          transcription: str, gold_description: str,
-                          structure_word: str) -> dict:
-        """Evaluate a child's response against the gold standard."""
+                          transcription: str, structure_word: str,
+                          entities: str = "", actions: str = "") -> dict:
+        """Evaluate a child's response against the expected answer."""
         system = """You are a warm, encouraging speech-language pathologist evaluating
 a child's verbal response during a V/V therapy session. The child was shown an image
 and asked a question. Their speech was transcribed by ASR (may contain minor errors).
@@ -114,7 +71,6 @@ Evaluate their response and return ONLY valid JSON:
   },
   "feedback": "A warm, encouraging 1-2 sentence response to the child. Acknowledge what they said well. If they missed something, gently guide them.",
   "missed_elements": ["list of key details they omitted"],
-  "extra_details": ["any additional correct observations they made"],
   "overall_score": 0-5
 }
 
@@ -125,43 +81,33 @@ Even partial or unclear answers deserve acknowledgment."""
         user = f"""Question asked: "{question}"
 Structure word focus: {structure_word}
 Expected answer: "{expected_answer}"
-Full image description: "{gold_description}"
+Image context: entities={entities}, actions={actions}
 
 Child's response (ASR transcription): "{transcription}"
 
 Evaluate this response. Return ONLY the JSON object."""
 
         raw = self._call(system, user)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            raw = raw.rsplit("```", 1)[0]
-        return json.loads(raw)
+        return self._parse_json(raw)
 
     def generate_followup(self, question: str, transcription: str,
-                          evaluation: dict, gold_description: str,
-                          structure_word: str) -> dict:
-        """Generate an adaptive follow-up based on the child's response.
+                          evaluation: dict, structure_word: str,
+                          entities: str = "", actions: str = "") -> dict:
+        """Generate a dynamic follow-up when accuracy < 4.
 
-        Returns a dict with ``comment`` (always) and, when the child struggled,
-        ``suggested_question`` + ``structure_word`` so the session can insert a
-        retry before moving on.
+        Returns dict with ``comment``, ``suggested_question``, ``structure_word``.
         """
-        overall = evaluation.get("overall_score", 5)
-
-        system = """You are a warm speech therapist working with a child. Based on their
-response and evaluation, generate a JSON object with these fields:
+        system = """You are a warm speech therapist working with a child. The child
+struggled with a question about an image. Generate a JSON object:
 
 {
-  "comment": "A warm 1-2 sentence response to the child.",
-  "suggested_question": "A follow-up question if the child struggled, or null if they did well.",
-  "structure_word": "The V/V structure word the suggested question targets, or null."
+  "comment": "A warm 1-2 sentence encouragement for the child.",
+  "suggested_question": "A simpler follow-up question approaching the same topic from an easier angle.",
+  "structure_word": "The V/V structure word this question targets."
 }
 
 Rules:
-- If the child scored well (4-5): set suggested_question and structure_word to null. Praise them warmly.
-- If the child scored poorly (1-3): write a gentle follow-up question that helps them try again
-  or approach the same topic from a simpler angle. Keep it very simple and encouraging.
+- The follow-up should be simpler and more specific than the original question.
 - Keep language simple, warm, and age-appropriate. No clinical jargon.
 - Return ONLY valid JSON, no markdown."""
 
@@ -171,21 +117,19 @@ Rules:
         user = f"""Original question: "{question}"
 Structure word: {structure_word}
 Child said: "{transcription}"
-Overall score: {overall}/5
+Overall score: {evaluation.get('overall_score', 0)}/5
 Evaluation feedback: {feedback}
 Missed elements: {missed}
-Image description: "{gold_description}"
+Image context: entities={entities}, actions={actions}
 
 Return ONLY the JSON object."""
 
         raw = self._call(system, user)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            raw = raw.rsplit("```", 1)[0]
-
-        import json
         try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return {"comment": raw, "suggested_question": None, "structure_word": None}
+            return self._parse_json(raw)
+        except (json.JSONDecodeError, ValueError):
+            return {
+                "comment": raw,
+                "suggested_question": question,
+                "structure_word": structure_word,
+            }

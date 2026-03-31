@@ -1,6 +1,6 @@
-/* ADI/O Therapy — Frontend */
-
-const API = '';
+/* ================================================================
+   ADI/O — Frontend Controller
+   ================================================================ */
 
 const state = {
     sessionId: null,
@@ -15,68 +15,50 @@ const state = {
     audioChunks: [],
 };
 
-/* ── Helpers ──────────────────────────────────────────────────────── */
+const $ = (sel) => document.querySelector(sel);
+const views = {
+    welcome: $('#welcome-view'),
+    session: $('#session-view'),
+    summary: $('#summary-view'),
+};
 
-function $(sel) { return document.querySelector(sel); }
-function $$(sel) { return document.querySelectorAll(sel); }
-
-function showView(id) {
-    $$('.view').forEach(v => v.classList.remove('active'));
-    const el = $(`#${id}`);
-    if (el) el.classList.add('active');
+/* ---- Helpers ---- */
+function showView(name) {
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    views[name].classList.add('active');
 }
 
-function showToast(msg, type = 'info') {
-    const div = document.createElement('div');
-    div.className = `toast toast-${type}`;
-    div.textContent = msg;
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 3500);
+function scoreEmoji(score) {
+    if (score >= 4) return '\u{1F60A}';
+    if (score >= 3) return '\u{1F610}';
+    return '\u{1F641}';
 }
 
-async function api(path, opts = {}) {
-    const res = await fetch(`${API}${path}`, opts);
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || 'Request failed');
-    }
-    return res.json();
+function speakText(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 0.9;
+    utt.pitch = 1.1;
+    window.speechSynthesis.speak(utt);
 }
 
-function scoreClass(score) {
-    return `sc-${Math.min(5, Math.max(0, Math.round(score)))}`;
-}
-
-function fillClass(score) {
-    return `fill-${Math.min(5, Math.max(0, Math.round(score)))}`;
-}
-
-function textColorClass(score) {
-    return `tc-${Math.min(5, Math.max(0, Math.round(score)))}`;
-}
-
-function badgeClass(word) {
-    const map = {
-        who: 'badge-who', what: 'badge-what', where: 'badge-where',
-        color: 'badge-color', size: 'badge-size', shape: 'badge-shape',
-        mood: 'badge-mood', movement: 'badge-movement',
-    };
-    return map[word] || 'badge-default';
-}
-
-/* ── Welcome ─────────────────────────────────────────────────────── */
-
+/* ================================================================
+   START SESSION
+   ================================================================ */
 async function startSession() {
     const btn = $('#start-btn');
+    btn.textContent = 'Starting\u2026';
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Preparing\u2026';
 
     try {
-        const data = await api('/api/session/start', {
+        const res = await fetch('/api/session/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
         });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
 
         state.sessionId = data.session_id;
         state.imageUrl = data.image_url;
@@ -85,288 +67,290 @@ async function startSession() {
         state.progress = data.progress;
 
         renderSession();
-        showView('session-view');
-    } catch (e) {
-        showToast(e.message, 'error');
+        showView('session');
+    } catch (err) {
+        alert('Failed to start session. ' + err.message);
     } finally {
-        btn.disabled = false;
         btn.textContent = 'Begin a Session';
+        btn.disabled = false;
     }
 }
 
-/* ── Session ─────────────────────────────────────────────────────── */
-
+/* ================================================================
+   RENDER SESSION
+   ================================================================ */
 function renderSession() {
     $('#session-image').src = state.imageUrl;
-    updateProgress();
     renderQuestion();
-    clearFeedback();
-}
-
-function updateProgress() {
-    const p = state.progress;
-    if (!p) return;
-    const pct = p.total > 0 ? (p.answered / p.total) * 100 : 0;
-    $('#progress-fill').style.width = `${pct}%`;
-    $('#progress-text').textContent = `Question ${p.answered + 1} of ${p.total}`;
+    updateProgress();
+    resetInteraction();
 }
 
 function renderQuestion() {
     const q = state.currentQuestion;
     if (!q) return;
     $('#question-text').textContent = q.text;
-    const badge = $('#structure-badge');
-    badge.textContent = q.structure_word;
-    badge.className = `structure-badge ${badgeClass(q.structure_word)}`;
 }
 
-function clearFeedback() {
+function updateProgress() {
+    const p = state.progress;
+    if (!p) return;
+    const current = p.answered + 1;
+    const pct = p.total ? Math.round((p.answered / p.total) * 100) : 0;
+    $('#progress-text').textContent = `${current}/${p.total}`;
+    $('#progress-fill').style.width = pct + '%';
+}
+
+function resetInteraction() {
     $('#transcription-area').classList.add('hidden');
     $('#feedback-area').classList.add('hidden');
     $('#feedback-area').innerHTML = '';
     $('#next-btn').classList.add('hidden');
     $('#mic-section').classList.remove('hidden');
+    $('#mic-label').textContent = 'Tap to speak';
 }
 
-/* ── Recording ───────────────────────────────────────────────────── */
-
+/* ================================================================
+   RECORDING
+   ================================================================ */
 async function toggleRecording() {
     if (state.isProcessing) return;
     if (state.isRecording) {
         stopRecording();
     } else {
-        startRecording();
+        await startRecording();
     }
 }
 
 async function startRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        state.audioChunks = [];
         state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-
-        state.mediaRecorder.ondataavailable = e => {
-            if (e.data.size > 0) state.audioChunks.push(e.data);
-        };
-
-        state.mediaRecorder.onstop = () => {
-            stream.getTracks().forEach(t => t.stop());
-            processAudio();
-        };
-
+        state.audioChunks = [];
+        state.mediaRecorder.ondataavailable = (e) => state.audioChunks.push(e.data);
+        state.mediaRecorder.onstop = handleRecordingComplete;
         state.mediaRecorder.start();
         state.isRecording = true;
-        updateMicUI();
-    } catch (e) {
-        showToast('Microphone access denied. Please allow microphone access.', 'error');
+        $('#mic-btn').classList.add('recording');
+        $('#waveform').classList.remove('hidden');
+        $('#mic-label').textContent = 'Listening\u2026 tap to stop';
+    } catch {
+        alert('Microphone access is required for this activity.');
     }
 }
 
 function stopRecording() {
-    if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+    if (state.mediaRecorder && state.isRecording) {
         state.mediaRecorder.stop();
-    }
-    state.isRecording = false;
-    updateMicUI();
-}
-
-function updateMicUI() {
-    const btn = $('#mic-btn');
-    const label = $('#mic-label');
-    const wave = $('#waveform');
-
-    if (state.isRecording) {
-        btn.classList.add('recording');
-        label.textContent = 'Tap to stop';
-        wave.classList.remove('hidden');
-    } else {
-        btn.classList.remove('recording');
-        label.textContent = state.isProcessing ? 'Processing\u2026' : 'Tap to speak';
-        wave.classList.add('hidden');
+        state.mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        state.isRecording = false;
+        $('#mic-btn').classList.remove('recording');
+        $('#mic-btn').classList.add('processing');
+        $('#waveform').classList.add('hidden');
+        $('#mic-label').textContent = 'Processing\u2026';
     }
 }
 
-async function processAudio() {
+async function handleRecordingComplete() {
     state.isProcessing = true;
-    updateMicUI();
-    $('#mic-btn').disabled = true;
-    $('#mic-label').textContent = 'Transcribing\u2026';
 
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const form = new FormData();
     form.append('audio', blob, 'recording.webm');
 
     try {
-        const result = await api(`/api/transcribe?session_id=${state.sessionId}`, {
+        const res = await fetch(`/api/transcribe?session_id=${state.sessionId}`, {
             method: 'POST',
             body: form,
         });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
 
-        state.lastTranscription = result.transcription;
-
-        $('#transcription-text').textContent = result.transcription || '(no speech detected)';
-        $('#transcription-area').classList.remove('hidden');
-
-        await evaluateResponse(result.transcription);
-    } catch (e) {
-        showToast('Transcription failed: ' + e.message, 'error');
+        state.lastTranscription = data.transcription || data.text;
+        showTranscription();
+        await evaluateResponse();
+    } catch (err) {
+        alert('Transcription failed. ' + err.message);
+        resetInteraction();
     } finally {
         state.isProcessing = false;
-        $('#mic-btn').disabled = false;
-        updateMicUI();
+        $('#mic-btn').classList.remove('processing');
     }
 }
 
-/* ── Evaluation ──────────────────────────────────────────────────── */
+function showTranscription() {
+    $('#transcription-text').textContent = state.lastTranscription;
+    $('#transcription-area').classList.remove('hidden');
+    $('#mic-section').classList.add('hidden');
+}
 
-async function evaluateResponse(transcription) {
-    $('#mic-label').textContent = 'Evaluating\u2026';
-
+/* ================================================================
+   EVALUATE
+   ================================================================ */
+async function evaluateResponse() {
     try {
-        const result = await api('/api/evaluate', {
+        const res = await fetch('/api/evaluate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 session_id: state.sessionId,
-                transcription: transcription,
+                transcription: state.lastTranscription,
             }),
         });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
 
-        renderFeedback(result);
-        state.progress = result.progress;
+        state.currentQuestion = data.next_question;
+        state.progress = data.progress;
         updateProgress();
+        renderFeedback(data);
 
-        if (result.next_question) {
-            state.currentQuestion = result.next_question;
+        if (data.completed) {
+            $('#next-btn').textContent = 'See Summary';
+        } else {
+            $('#next-btn').textContent = 'Next';
         }
-
-        if (result.completed) {
-            $('#next-btn').textContent = 'View Summary \u2192';
-        }
-    } catch (e) {
-        showToast('Evaluation failed: ' + e.message, 'error');
-    } finally {
-        updateMicUI();
+        $('#next-btn').classList.remove('hidden');
+    } catch (err) {
+        alert('Evaluation failed. ' + err.message);
     }
 }
 
 function renderFeedback(result) {
-    const ev = result.evaluation;
+    const ev = result.evaluation || {};
+    const overall = ev.overall_score || 3;
+    const feedback = ev.feedback || '';
+    const comment = result.followup || '';
+    const display = comment || feedback;
+
+    const emoji = scoreEmoji(overall);
+
+    const headingMap = {
+        5: 'Excellent work!',
+        4: 'Great job!',
+        3: 'Good effort!',
+        2: 'Nice try!',
+        1: 'Keep going!',
+    };
+    const heading = headingMap[Math.round(overall)] || 'Good effort!';
+
     const area = $('#feedback-area');
-    const scores = ev.scores || {};
-    const categories = ['accuracy', 'detail', 'clarity', 'relevance'];
-    const overall = ev.overall_score || 0;
-
-    let scoresHtml = categories.map(cat => {
-        const val = scores[cat] || 0;
-        return `
-            <div class="score-row">
-                <span class="score-row-label">${cat}</span>
-                <div class="score-bar">
-                    <div class="score-bar-fill ${fillClass(val)}" style="width:${val * 20}%"></div>
-                </div>
-                <span class="score-row-val ${textColorClass(val)}">${val}/5</span>
-            </div>`;
-    }).join('');
-
     area.innerHTML = `
         <div class="feedback-card">
-            <div class="feedback-header">
-                <span class="feedback-heading">Feedback</span>
-                <div class="feedback-score-badge ${scoreClass(overall)}">${overall}</div>
+            <span class="feedback-emoji">${emoji}</span>
+            <p class="feedback-heading">${heading}</p>
+            <p class="feedback-text">${display}</p>
+            <div class="feedback-actions">
+                <button class="tts-btn" id="tts-play-btn" title="Read aloud">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </button>
             </div>
-            <p class="feedback-text">${ev.feedback || ''}</p>
-            <div class="scores-list">${scoresHtml}</div>
-            ${result.followup ? `<div class="followup-box">${result.followup}</div>` : ''}
-        </div>`;
-
+        </div>
+    `;
     area.classList.remove('hidden');
-    $('#mic-section').classList.add('hidden');
-    $('#next-btn').classList.remove('hidden');
+
+    const ttsBtn = $('#tts-play-btn');
+    ttsBtn.addEventListener('click', () => {
+        speakText(display);
+        ttsBtn.classList.add('speaking');
+        const checkDone = setInterval(() => {
+            if (!window.speechSynthesis.speaking) {
+                ttsBtn.classList.remove('speaking');
+                clearInterval(checkDone);
+            }
+        }, 200);
+    });
 }
 
-function nextQuestion() {
+/* ================================================================
+   NEXT / CLOSE / SUMMARY
+   ================================================================ */
+function handleNext() {
+    window.speechSynthesis.cancel();
     if (state.progress && state.progress.completed) {
-        showSummary();
+        loadSummary();
         return;
     }
-    renderQuestion();
-    clearFeedback();
+    if (state.currentQuestion) {
+        renderQuestion();
+        resetInteraction();
+    }
 }
 
-/* ── Summary ─────────────────────────────────────────────────────── */
-
-async function showSummary() {
-    showView('summary-view');
-
+async function handleClose() {
+    window.speechSynthesis.cancel();
+    if (!state.sessionId) return;
     try {
-        const data = await api(`/api/session/${state.sessionId}/summary`);
+        await fetch(`/api/session/${state.sessionId}/end`, { method: 'POST' });
+    } catch { /* best-effort */ }
+    loadSummary();
+}
+
+async function loadSummary() {
+    try {
+        const res = await fetch(`/api/session/${state.sessionId}/summary`);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
         renderSummary(data);
-    } catch (e) {
-        showToast('Failed to load summary', 'error');
+        showView('summary');
+    } catch (err) {
+        alert('Could not load summary. ' + err.message);
     }
 }
 
 function renderSummary(data) {
-    const avg = data.category_averages || {};
-    const categories = ['accuracy', 'detail', 'clarity', 'relevance'];
-
+    const p = data.progress || {};
+    const total = p.total || 0;
+    const answered = p.answered || 0;
+    $('#summary-stats').textContent = `You answered ${answered} question${answered !== 1 ? 's' : ''}. Great effort!`;
     $('#summary-image').src = `/images/${data.image_filename}`;
 
-    const overallAvg = categories.reduce((s, c) => s + (avg[c] || 0), 0) / categories.length;
-    $('#summary-overall').textContent = overallAvg.toFixed(1);
-    $('#summary-overall-wrap').className = `score-circle ${scoreClass(Math.round(overallAvg))}`;
+    const history = data.qa_history || [];
+    const container = $('#summary-history');
+    container.innerHTML = history.map(item => {
+        const overall = item.evaluation?.overall_score || 3;
+        const emoji = scoreEmoji(overall);
+        const fb = item.followup || item.evaluation?.feedback || '';
+        const feedbackHtml = fb
+            ? `<div class="history-feedback"><span class="history-emoji">${emoji}</span>"${fb}"</div>`
+            : '';
 
-    let scoresHtml = categories.map(cat => {
-        const val = avg[cat] || 0;
-        return `
-            <div class="score-row">
-                <span class="score-row-label">${cat}</span>
-                <div class="score-bar">
-                    <div class="score-bar-fill ${fillClass(Math.round(val))}" style="width:${val * 20}%"></div>
-                </div>
-                <span class="score-row-val ${textColorClass(Math.round(val))}">${val.toFixed(1)}/5</span>
-            </div>`;
-    }).join('');
-    $('#summary-scores').innerHTML = scoresHtml;
-
-    let histHtml = (data.qa_history || []).map((item, i) => {
-        const ev = item.evaluation || {};
-        const overall = ev.overall_score || 0;
         return `
             <div class="history-item">
-                <div class="history-item-header">
-                    <div>
-                        <span class="history-q-num">Q${i + 1}</span>
-                        <span class="structure-badge ${badgeClass(item.structure_word)}" style="font-size:0.7rem;padding:2px 10px;margin-left:8px;">${item.structure_word}</span>
-                    </div>
-                    <span class="score-row-val ${textColorClass(overall)}">${overall}/5</span>
+                <p class="history-q">
+                    <span class="history-badge">${item.structure_word}</span>
+                    ${item.question}
+                </p>
+                <div class="history-meta">
+                    <strong>Expected:</strong> ${item.expected_answer || '\u2014'}<br>
+                    <strong>You said:</strong> ${item.transcription || '\u2014'}
                 </div>
-                <p class="history-question">${item.question}</p>
-                <p class="history-detail"><em>Expected:</em> ${item.expected_answer}</p>
-                <p class="history-detail"><em>You said:</em> ${item.transcription || '\u2014'}</p>
-                ${ev.feedback ? `<p class="history-feedback">\u201c${ev.feedback}\u201d</p>` : ''}
-            </div>`;
+                ${feedbackHtml}
+            </div>
+        `;
     }).join('');
-    $('#summary-history').innerHTML = histHtml;
-
-    const p = data.progress || {};
-    $('#summary-stats').textContent =
-        `You answered ${p.answered || 0} questions out of ${p.total || 0}.`;
 }
 
-function newSession() {
+function resetForNewSession() {
     state.sessionId = null;
-    showView('welcome-view');
+    state.imageUrl = null;
+    state.currentQuestion = null;
+    state.totalQuestions = 0;
+    state.progress = null;
+    state.lastTranscription = null;
+    showView('welcome');
 }
 
-/* ── Init ─────────────────────────────────────────────────────────── */
-
+/* ================================================================
+   INIT
+   ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-    showView('welcome-view');
-
+    showView('welcome');
     $('#start-btn').addEventListener('click', startSession);
     $('#mic-btn').addEventListener('click', toggleRecording);
-    $('#next-btn').addEventListener('click', nextQuestion);
-    $('#new-session-btn').addEventListener('click', newSession);
+    $('#next-btn').addEventListener('click', handleNext);
+    $('#new-session-btn').addEventListener('click', resetForNewSession);
+    $('#close-btn').addEventListener('click', handleClose);
 });

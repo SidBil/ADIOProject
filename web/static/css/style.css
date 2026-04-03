@@ -1,445 +1,61 @@
-/* ================================================================
-   ADI/O  —  Playful, Friendly, Educational
-   ================================================================
-   Palette:  warm cream bg, dark navy cards/buttons, baby blue
-             feedback, pink accents, lime-green progress.
-   Fonts:    League Spartan (headings/buttons), Inter (body).
-   ================================================================ */
+/* ADI/O — minimal CSS, most styling is inline per spec */
 
-:root {
-    --cream:       #fff6ef;
-    --white:       #ffffff;
-    --navy:        #0d1b2e;
-    --navy-light:  #152640;
-    --pink:        #e91e63;
-    --pink-hover:  #c2185b;
-    --pink-pale:   #f8e0ea;
-    --blue-light:  #c5ebfb;
-    --blue-border: #89d4f2;
-    --lime:        #bdda20;
-    --lime-dark:   #9ab61a;
-    --salmon:      #f0b8c8;
-    --ink:         #1a1a2e;
-    --ink-muted:   #6b6b8a;
-    --red:         #e53935;
-    --star-blue:   #2da5da;
-    --radius:      14px;
-    --radius-lg:   20px;
-    --shadow-sm:   0 2px 6px rgba(0,0,0,0.07);
-    --shadow-md:   0 4px 16px rgba(0,0,0,0.09);
-}
-
-/* ---- Reset ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; scroll-behavior: smooth; }
+html, body { overflow: hidden; }
 
 body {
-    background: var(--cream);
-    color: var(--ink);
     font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    line-height: 1.6;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
-    min-height: 100vh;
 }
 
-h1, h2, h3 {
-    font-family: 'League Spartan', 'Arial Black', sans-serif;
-    font-weight: 700;
+.view { display: none !important; }
+.view.active { display: flex !important; }
+
+#welcome-view.active { align-items:center; justify-content:center; }
+#session-view.active { flex-direction:column; gap:16px; }
+#summary-view.active { align-items:center; justify-content:center; }
+
+/* Recording pulse — only animation in the app */
+@keyframes rec-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(239,26,106,0.35); }
+    70%  { box-shadow: 0 0 0 12px rgba(239,26,106,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,26,106,0); }
 }
 
-.view { display: none; }
-.view.active { display: block; }
-.hidden { display: none !important; }
-
-/* ================================================================
-   WELCOME
-   ================================================================ */
-.welcome-page {
-    max-width: 480px;
-    margin: 60px auto;
-    padding: 44px 36px;
-    background: var(--white);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    text-align: center;
+.mic-recording {
+    animation: rec-pulse 1.2s infinite;
 }
 
-.welcome-logo { height: 72px; margin-bottom: 4px; }
-
-.welcome-subtitle {
-    font-family: 'League Spartan', sans-serif;
-    font-weight: 600;
-    font-size: 1rem;
-    color: var(--ink-muted);
-    margin-top: 2px;
+/* Summary history items */
+.history-item {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-.welcome-divider {
-    width: 48px; height: 4px; border-radius: 2px;
-    background: var(--pink);
-    margin: 20px auto;
-}
-
-.welcome-body {
-    font-size: 0.92rem; color: var(--ink-muted);
-    line-height: 1.7; margin-bottom: 24px;
-}
-
-.welcome-steps {
-    display: flex; flex-direction: column; gap: 12px;
-    text-align: left; margin-bottom: 28px;
-}
-
-.welcome-step { display: flex; align-items: flex-start; gap: 14px; }
-
-.step-num {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--pink); color: var(--white);
-    font-family: 'League Spartan', sans-serif;
-    font-weight: 700; font-size: 0.85rem;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-}
-
-.welcome-step strong {
-    display: block; font-family: 'League Spartan', sans-serif;
-    font-size: 0.95rem; font-weight: 700; color: var(--ink);
-}
-
-.welcome-step p { font-size: 0.84rem; color: var(--ink-muted); margin-top: 1px; }
-
-.welcome-hint { font-size: 0.8rem; color: var(--ink-muted); margin-top: 12px; }
-
-/* ================================================================
-   BUTTONS
-   ================================================================ */
-.btn-primary {
-    display: inline-block; padding: 14px 40px;
-    background: var(--navy); color: var(--white);
-    font-family: 'League Spartan', sans-serif;
-    font-size: 1rem; font-weight: 700;
-    border: none; border-radius: 10px; cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-}
-.btn-primary:hover { background: var(--navy-light); transform: translateY(-1px); }
-.btn-primary:active { transform: translateY(0); }
-
-.btn-next {
-    display: block; width: 100%; padding: 16px;
-    background: var(--navy); color: var(--white);
-    font-family: 'League Spartan', sans-serif;
-    font-size: 1.05rem; font-weight: 700;
-    border: none; border-radius: 10px; cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-    letter-spacing: 0.02em;
-}
-.btn-next:hover { background: var(--navy-light); transform: translateY(-1px); }
-.btn-next:active { transform: translateY(0); }
-
-/* ================================================================
-   SESSION HEADER — cream bg, matches page
-   ================================================================ */
-.session-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 24px;
-    background: var(--cream);
-}
-
-.header-logo { height: 48px; }
-
-.session-progress-label {
-    font-family: 'League Spartan', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--navy);
-    white-space: nowrap;
-}
-
-.progress-track {
-    flex: 1;
-    height: 12px;
-    background: var(--navy);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--lime);
-    border-radius: 6px;
-    transition: width 0.4s ease;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: var(--navy);
-    font-size: 2rem;
-    font-weight: 700;
-    cursor: pointer;
-    line-height: 1;
-    padding: 0 4px;
-    transition: opacity 0.2s;
-}
-.close-btn:hover { opacity: 0.6; }
-
-/* ================================================================
-   SESSION LAYOUT
-   ================================================================ */
-.session-main { padding: 16px 24px 36px; }
-
-.session-layout {
-    max-width: 1140px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1.4fr 0.6fr;
-    gap: 20px;
-    align-items: start;
-}
-
-/* ---- Image ---- */
-.image-panel { display: flex; justify-content: center; }
-
-.image-frame {
-    background: var(--white);
-    border-radius: var(--radius-lg);
-    border: 6px solid var(--salmon);
-    padding: 6px;
-    box-shadow: var(--shadow-md);
-}
-
-.image-frame img {
-    display: block;
-    max-width: 100%;
-    border-radius: calc(var(--radius-lg) - 8px);
-}
-
-/* ---- Interaction ---- */
-.interaction-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-/* ================================================================
-   TRANSCRIPTION CARD
-   ================================================================ */
-.transcription-card {
-    position: relative;
-    background: var(--white);
-    border-radius: var(--radius);
-    padding: 14px 52px 14px 16px;
-    box-shadow: var(--shadow-sm);
-    min-height: 56px;
-}
-
-.transcription-text {
-    font-size: 0.82rem;
-    color: var(--ink);
-    font-style: italic;
+.history-item p {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    color: #002252;
     line-height: 1.5;
 }
 
-.mic-inline-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    border: none;
-    background: var(--pink);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, transform 0.15s;
-}
-.mic-inline-btn svg { width: 20px; height: 20px; fill: var(--white); }
-.mic-inline-btn:hover { background: var(--pink-hover); transform: scale(1.06); }
-
-/* ================================================================
-   QUESTION CARD
-   ================================================================ */
-.question-card {
-    background: var(--navy);
-    border-radius: var(--radius);
-    padding: 24px 20px;
-    box-shadow: var(--shadow-sm);
-}
-
-.question-text {
+.history-item .h-q {
     font-family: 'League Spartan', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    line-height: 1.35;
-    color: var(--white);
-    text-align: center;
+    font-weight: 800;
+    font-size: 24px;
+    color: #002248;
+    margin-bottom: 6px;
 }
 
-/* ================================================================
-   MICROPHONE
-   ================================================================ */
-.mic-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 0;
-}
-
-.mic-btn {
-    width: 68px; height: 68px; border-radius: 50%;
-    border: none; background: var(--pink); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
-    box-shadow: var(--shadow-sm);
-}
-.mic-btn svg { width: 30px; height: 30px; fill: var(--white); }
-.mic-btn:hover { background: var(--pink-hover); transform: scale(1.06); }
-
-.mic-btn.recording {
-    background: var(--red);
-    box-shadow: 0 0 0 6px rgba(229,57,53,0.25);
-    animation: pulse-ring 1.4s infinite;
-}
-
-@keyframes pulse-ring {
-    0%   { box-shadow: 0 0 0 0 rgba(229,57,53,0.35); }
-    70%  { box-shadow: 0 0 0 14px rgba(229,57,53,0); }
-    100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); }
-}
-
-.mic-label { font-size: 0.82rem; color: var(--ink-muted); font-weight: 500; }
-
-.mic-btn.processing { background: var(--ink-muted); cursor: wait; animation: none; }
-
-.waveform { display: flex; align-items: center; gap: 4px; height: 32px; }
-
-.waveform span {
-    width: 5px; border-radius: 3px; background: var(--red);
-    animation: wave 0.8s ease-in-out infinite alternate;
-}
-.waveform span:nth-child(1) { height: 10px; animation-delay: 0s; }
-.waveform span:nth-child(2) { height: 18px; animation-delay: 0.15s; }
-.waveform span:nth-child(3) { height: 26px; animation-delay: 0.3s; }
-.waveform span:nth-child(4) { height: 18px; animation-delay: 0.45s; }
-.waveform span:nth-child(5) { height: 10px; animation-delay: 0.6s; }
-
-@keyframes wave { to { height: 6px; } }
-
-/* ================================================================
-   FEEDBACK CARD
-   ================================================================ */
-.feedback-card {
-    background: var(--blue-light);
-    border: 2px solid var(--pink);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-}
-
-.feedback-emoji { font-size: 1.5rem; margin-bottom: 4px; display: block; }
-
-.feedback-heading {
-    font-family: 'League Spartan', sans-serif;
-    font-weight: 700; font-size: 0.9rem;
-    color: var(--ink); margin-bottom: 4px;
-}
-
-.feedback-text {
-    font-size: 0.84rem; color: var(--ink); line-height: 1.55;
-}
-
-.feedback-actions {
-    display: flex; align-items: center; gap: 8px; margin-top: 10px;
-}
-
-.tts-btn {
-    width: 34px; height: 34px; border-radius: 50%; border: none;
-    background: var(--red); color: var(--white); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; transition: background 0.2s, transform 0.15s;
-}
-.tts-btn:hover { background: #c62828; transform: scale(1.08); }
-.tts-btn.speaking { background: var(--ink-muted); }
-.tts-btn svg { width: 16px; height: 16px; fill: var(--white); }
-
-/* ================================================================
-   SUMMARY
-   ================================================================ */
-.summary-page {
-    max-width: 600px; margin: 48px auto;
-    padding: 0 24px; text-align: center;
-}
-
-.summary-logo { height: 56px; margin-bottom: 12px; }
-
-.summary-title { font-size: 2.2rem; color: var(--navy); }
-
-.summary-subtitle {
-    font-size: 1rem; color: var(--ink-muted);
-    margin-top: 6px; font-weight: 500;
-}
-
-.summary-image-wrap { margin: 24px auto; max-width: 280px; }
-
-.summary-image {
-    width: 100%; border-radius: var(--radius-lg);
-    border: 6px solid var(--salmon); box-shadow: var(--shadow-sm);
-}
-
-.section-heading {
-    font-family: 'League Spartan', sans-serif;
-    font-size: 1.15rem; color: var(--ink);
-    margin-bottom: 14px; text-align: left;
-}
-
-.history-list {
-    display: flex; flex-direction: column;
-    gap: 12px; margin-bottom: 32px;
-}
-
-.history-item {
-    background: var(--white); border-radius: var(--radius);
-    padding: 16px 18px; text-align: left; box-shadow: var(--shadow-sm);
-}
-
-.history-q {
-    font-family: 'League Spartan', sans-serif;
-    font-size: 0.92rem; font-weight: 600;
-    color: var(--navy); margin-bottom: 6px;
-}
-
-.history-badge {
-    display: inline-block; padding: 2px 10px;
-    font-size: 0.68rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em;
-    border-radius: 100px; background: var(--pink-pale);
-    color: var(--pink); margin-right: 6px; vertical-align: middle;
-}
-
-.history-meta {
-    font-size: 0.82rem; color: var(--ink-muted); line-height: 1.5;
-}
-
-.history-feedback {
-    margin-top: 8px; padding-top: 8px;
+.history-item .h-fb {
+    margin-top: 8px;
+    padding-top: 8px;
     border-top: 1px solid #e8e8f0;
-    font-size: 0.84rem; color: var(--navy); font-style: italic;
-}
-
-.history-emoji { font-size: 1.1rem; margin-right: 4px; vertical-align: middle; }
-
-/* ================================================================
-   RESPONSIVE
-   ================================================================ */
-@media (max-width: 768px) {
-    .session-layout { grid-template-columns: 1fr; }
-    .welcome-page { margin: 24px 16px; padding: 32px 24px; }
-    .session-header { padding: 10px 14px; gap: 10px; }
-    .session-main { padding: 14px 14px 28px; }
-    .summary-page { margin: 32px auto; }
-    .question-text { font-size: 1.1rem; }
+    font-style: italic;
+    color: #29A5E1;
 }

@@ -1,6 +1,12 @@
 /* ================================================================
-   ADI/O — Frontend Controller
+   ADI/O — Controller
    ================================================================ */
+
+const MIC_IMG = '<img src="/static/images/micV3.png" alt="mic" style="width:100%;height:100%;object-fit:contain;">';
+
+const STAR_PATH = 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z';
+
+const HEADING_MAP = { 5: 'Excellent!', 4: 'Great Job!', 3: 'Good Effort!', 2: 'Nice Try!', 1: 'Keep Going!' };
 
 const state = {
     sessionId: null,
@@ -15,42 +21,95 @@ const state = {
     audioChunks: [],
 };
 
-const $ = (sel) => document.querySelector(sel);
-const views = {
-    welcome: $('#welcome-view'),
-    session: $('#session-view'),
-    summary: $('#summary-view'),
-};
+const $ = (s) => document.querySelector(s);
 
-/* ---- Helpers ---- */
 function showView(name) {
-    Object.values(views).forEach(v => v.classList.remove('active'));
-    views[name].classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $(`#${name}-view`).classList.add('active');
 }
 
-function scoreEmoji(score) {
-    if (score >= 4) return '\u{1F60A}';
-    if (score >= 3) return '\u{1F610}';
-    return '\u{1F641}';
+/* ---- Stars ---- */
+function starsHTML(score) {
+    let html = '<div style="display:flex;justify-content:center;gap:10px;margin-bottom:0;">';
+    for (let i = 1; i <= 5; i++) {
+        const fill = i <= score ? '#F71D73' : '#001543';
+        html += `<svg viewBox="0 0 24 24" width="44" height="44" xmlns="http://www.w3.org/2000/svg"><path d="${STAR_PATH}" fill="${fill}"/></svg>`;
+    }
+    html += '</div>';
+    return html;
 }
 
-function speakText(text) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9;
-    utt.pitch = 1.1;
-    window.speechSynthesis.speak(utt);
+/* ---- Progress ---- */
+function updateProgress() {
+    const p = state.progress;
+    if (!p) return;
+    const current = Math.min(p.answered + 1, p.total);
+    const pct = p.total ? Math.round((p.answered / p.total) * 100) : 0;
+    $('#progress-text').textContent = `${current}/${p.total}`;
+    $('#progress-fill').style.width = pct + '%';
 }
 
 /* ================================================================
-   START SESSION
+   SIDEBAR CARD — STATE 1: Question + Mic
+   ================================================================ */
+function renderQuestionCard() {
+    const q = state.currentQuestion;
+    if (!q) return;
+    const card = $('#sidebar-card');
+    card.innerHTML = `
+        <div style="background:#FFDEE9;border:5px solid #EF1A6A;border-radius:22px;padding:16px 14px;">
+            <p style="color:#002248;font-family:'League Spartan',sans-serif;font-weight:800;font-size:32px;text-align:center;line-height:1.35;margin:0 0 10px 0;">
+                ${q.text}
+            </p>
+            <div style="background:#FFF6C1;border:5px solid #fbde28;border-radius:18px;padding:24px 20px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+                <button id="mic-btn-inner"
+                        style="width:160px;height:160px;border-radius:50%;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;overflow:hidden;">
+                    ${MIC_IMG}
+                </button>
+                <span id="mic-label" style="color:#002248;font-family:'Inter',sans-serif;font-weight:600;font-size:24px;text-align:center;">
+                    Tap to Answer
+                </span>
+            </div>
+        </div>
+    `;
+    $('#mic-btn-inner').addEventListener('click', toggleRecording);
+}
+
+/* ================================================================
+   SIDEBAR CARD — STATE 2: Feedback
+   ================================================================ */
+function renderFeedbackCard(result) {
+    const ev = result.evaluation || {};
+    const score = Math.round(ev.overall_score || 3);
+    const heading = HEADING_MAP[score] || 'Good Effort!';
+    const comment = result.followup || ev.feedback || '';
+
+    const card = $('#sidebar-card');
+    card.innerHTML = `
+        <div style="background:#C8EFFF;border:5px solid #29A5E1;border-radius:22px;padding:28px 24px;text-align:center;">
+            <p style="color:#002252;font-family:'League Spartan',sans-serif;font-weight:800;font-size:44px;margin:0 0 12px 0;">
+                ${heading}
+            </p>
+            ${starsHTML(score)}
+            <p style="color:#002252;font-family:'Inter',sans-serif;font-weight:400;font-size:24px;text-align:center;line-height:1.55;margin:16px 0 24px 0;">
+                ${comment}
+            </p>
+            <button id="next-btn-inner"
+                    style="background:#F3FFAD;border:5px solid #BCD533;border-radius:999px;padding:16px 0;width:80%;margin:0 auto;display:block;cursor:pointer;">
+                <span style="color:#101101;font-family:'League Spartan',sans-serif;font-weight:800;font-size:30px;">Next</span>
+            </button>
+        </div>
+    `;
+    $('#next-btn-inner').addEventListener('click', handleNext);
+}
+
+/* ================================================================
+   SESSION
    ================================================================ */
 async function startSession() {
     const btn = $('#start-btn');
     btn.textContent = 'Starting\u2026';
     btn.disabled = true;
-
     try {
         const res = await fetch('/api/session/start', {
             method: 'POST',
@@ -59,14 +118,14 @@ async function startSession() {
         });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
-
         state.sessionId = data.session_id;
         state.imageUrl = data.image_url;
         state.currentQuestion = data.question;
         state.totalQuestions = data.total_questions;
         state.progress = data.progress;
-
-        renderSession();
+        $('#session-image').src = state.imageUrl;
+        updateProgress();
+        renderQuestionCard();
         showView('session');
     } catch (err) {
         alert('Failed to start session. ' + err.message);
@@ -77,49 +136,11 @@ async function startSession() {
 }
 
 /* ================================================================
-   RENDER SESSION
-   ================================================================ */
-function renderSession() {
-    $('#session-image').src = state.imageUrl;
-    renderQuestion();
-    updateProgress();
-    resetInteraction();
-}
-
-function renderQuestion() {
-    const q = state.currentQuestion;
-    if (!q) return;
-    $('#question-text').textContent = q.text;
-}
-
-function updateProgress() {
-    const p = state.progress;
-    if (!p) return;
-    const current = p.answered + 1;
-    const pct = p.total ? Math.round((p.answered / p.total) * 100) : 0;
-    $('#progress-text').textContent = `${current}/${p.total}`;
-    $('#progress-fill').style.width = pct + '%';
-}
-
-function resetInteraction() {
-    $('#transcription-area').classList.add('hidden');
-    $('#feedback-area').classList.add('hidden');
-    $('#feedback-area').innerHTML = '';
-    $('#next-btn').classList.add('hidden');
-    $('#mic-section').classList.remove('hidden');
-    $('#mic-label').textContent = 'Tap to speak';
-}
-
-/* ================================================================
    RECORDING
    ================================================================ */
 async function toggleRecording() {
     if (state.isProcessing) return;
-    if (state.isRecording) {
-        stopRecording();
-    } else {
-        await startRecording();
-    }
+    state.isRecording ? stopRecording() : await startRecording();
 }
 
 async function startRecording() {
@@ -131,11 +152,12 @@ async function startRecording() {
         state.mediaRecorder.onstop = handleRecordingComplete;
         state.mediaRecorder.start();
         state.isRecording = true;
-        $('#mic-btn').classList.add('recording');
-        $('#waveform').classList.remove('hidden');
-        $('#mic-label').textContent = 'Listening\u2026 tap to stop';
+        const btn = $('#mic-btn-inner');
+        if (btn) btn.classList.add('mic-recording');
+        const lbl = $('#mic-label');
+        if (lbl) lbl.textContent = 'Listening\u2026 tap to stop';
     } catch {
-        alert('Microphone access is required for this activity.');
+        alert('Microphone access is required.');
     }
 }
 
@@ -144,147 +166,59 @@ function stopRecording() {
         state.mediaRecorder.stop();
         state.mediaRecorder.stream.getTracks().forEach(t => t.stop());
         state.isRecording = false;
-        $('#mic-btn').classList.remove('recording');
-        $('#mic-btn').classList.add('processing');
-        $('#waveform').classList.add('hidden');
-        $('#mic-label').textContent = 'Processing\u2026';
+        const btn = $('#mic-btn-inner');
+        if (btn) { btn.classList.remove('mic-recording'); btn.style.opacity = '0.5'; btn.style.cursor = 'wait'; }
+        const lbl = $('#mic-label');
+        if (lbl) lbl.textContent = 'Processing\u2026';
     }
 }
 
 async function handleRecordingComplete() {
     state.isProcessing = true;
-
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const form = new FormData();
     form.append('audio', blob, 'recording.webm');
 
     try {
-        const res = await fetch(`/api/transcribe?session_id=${state.sessionId}`, {
-            method: 'POST',
-            body: form,
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
+        const tres = await fetch(`/api/transcribe?session_id=${state.sessionId}`, { method: 'POST', body: form });
+        if (!tres.ok) throw new Error(await tres.text());
+        const tdata = await tres.json();
+        state.lastTranscription = tdata.transcription || tdata.text;
 
-        state.lastTranscription = data.transcription || data.text;
-        showTranscription();
-        await evaluateResponse();
-    } catch (err) {
-        alert('Transcription failed. ' + err.message);
-        resetInteraction();
-    } finally {
-        state.isProcessing = false;
-        $('#mic-btn').classList.remove('processing');
-    }
-}
-
-function showTranscription() {
-    $('#transcription-text').textContent = state.lastTranscription;
-    $('#transcription-area').classList.remove('hidden');
-    $('#mic-section').classList.add('hidden');
-}
-
-/* ================================================================
-   EVALUATE
-   ================================================================ */
-async function evaluateResponse() {
-    try {
-        const res = await fetch('/api/evaluate', {
+        const eres = await fetch('/api/evaluate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: state.sessionId,
-                transcription: state.lastTranscription,
-            }),
+            body: JSON.stringify({ session_id: state.sessionId, transcription: state.lastTranscription }),
         });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
+        if (!eres.ok) throw new Error(await eres.text());
+        const edata = await eres.json();
 
-        state.currentQuestion = data.next_question;
-        state.progress = data.progress;
+        state.currentQuestion = edata.next_question;
+        state.progress = edata.progress;
         updateProgress();
-        renderFeedback(data);
-
-        if (data.completed) {
-            $('#next-btn').textContent = 'See Summary';
-        } else {
-            $('#next-btn').textContent = 'Next';
-        }
-        $('#next-btn').classList.remove('hidden');
+        renderFeedbackCard(edata);
     } catch (err) {
-        alert('Evaluation failed. ' + err.message);
+        alert('Something went wrong. ' + err.message);
+        renderQuestionCard();
+    } finally {
+        state.isProcessing = false;
     }
-}
-
-function renderFeedback(result) {
-    const ev = result.evaluation || {};
-    const overall = ev.overall_score || 3;
-    const feedback = ev.feedback || '';
-    const comment = result.followup || '';
-    const display = comment || feedback;
-
-    const emoji = scoreEmoji(overall);
-
-    const headingMap = {
-        5: 'Excellent work!',
-        4: 'Great job!',
-        3: 'Good effort!',
-        2: 'Nice try!',
-        1: 'Keep going!',
-    };
-    const heading = headingMap[Math.round(overall)] || 'Good effort!';
-
-    const area = $('#feedback-area');
-    area.innerHTML = `
-        <div class="feedback-card">
-            <span class="feedback-emoji">${emoji}</span>
-            <p class="feedback-heading">${heading}</p>
-            <p class="feedback-text">${display}</p>
-            <div class="feedback-actions">
-                <button class="tts-btn" id="tts-play-btn" title="Read aloud">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M8 5v14l11-7z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `;
-    area.classList.remove('hidden');
-
-    const ttsBtn = $('#tts-play-btn');
-    ttsBtn.addEventListener('click', () => {
-        speakText(display);
-        ttsBtn.classList.add('speaking');
-        const checkDone = setInterval(() => {
-            if (!window.speechSynthesis.speaking) {
-                ttsBtn.classList.remove('speaking');
-                clearInterval(checkDone);
-            }
-        }, 200);
-    });
 }
 
 /* ================================================================
    NEXT / CLOSE / SUMMARY
    ================================================================ */
 function handleNext() {
-    window.speechSynthesis.cancel();
     if (state.progress && state.progress.completed) {
         loadSummary();
-        return;
-    }
-    if (state.currentQuestion) {
-        renderQuestion();
-        resetInteraction();
+    } else if (state.currentQuestion) {
+        renderQuestionCard();
     }
 }
 
 async function handleClose() {
-    window.speechSynthesis.cancel();
     if (!state.sessionId) return;
-    try {
-        await fetch(`/api/session/${state.sessionId}/end`, { method: 'POST' });
-    } catch { /* best-effort */ }
+    try { await fetch(`/api/session/${state.sessionId}/end`, { method: 'POST' }); } catch {}
     loadSummary();
 }
 
@@ -302,44 +236,26 @@ async function loadSummary() {
 
 function renderSummary(data) {
     const p = data.progress || {};
-    const total = p.total || 0;
-    const answered = p.answered || 0;
-    $('#summary-stats').textContent = `You answered ${answered} question${answered !== 1 ? 's' : ''}. Great effort!`;
+    $('#summary-stats').textContent = `You answered ${p.answered || 0} question${(p.answered||0) !== 1 ? 's' : ''}. Great effort!`;
     $('#summary-image').src = `/images/${data.image_filename}`;
 
     const history = data.qa_history || [];
     const container = $('#summary-history');
     container.innerHTML = history.map(item => {
-        const overall = item.evaluation?.overall_score || 3;
-        const emoji = scoreEmoji(overall);
         const fb = item.followup || item.evaluation?.feedback || '';
-        const feedbackHtml = fb
-            ? `<div class="history-feedback"><span class="history-emoji">${emoji}</span>"${fb}"</div>`
-            : '';
-
+        const fbHTML = fb ? `<p class="h-fb">"${fb}"</p>` : '';
         return `
             <div class="history-item">
-                <p class="history-q">
-                    <span class="history-badge">${item.structure_word}</span>
-                    ${item.question}
-                </p>
-                <div class="history-meta">
-                    <strong>Expected:</strong> ${item.expected_answer || '\u2014'}<br>
-                    <strong>You said:</strong> ${item.transcription || '\u2014'}
-                </div>
-                ${feedbackHtml}
-            </div>
-        `;
+                <p class="h-q">${item.question}</p>
+                <p><strong>Expected:</strong> ${item.expected_answer || '\u2014'}</p>
+                <p><strong>You said:</strong> ${item.transcription || '\u2014'}</p>
+                ${fbHTML}
+            </div>`;
     }).join('');
 }
 
 function resetForNewSession() {
-    state.sessionId = null;
-    state.imageUrl = null;
-    state.currentQuestion = null;
-    state.totalQuestions = 0;
-    state.progress = null;
-    state.lastTranscription = null;
+    Object.assign(state, { sessionId: null, imageUrl: null, currentQuestion: null, totalQuestions: 0, progress: null, lastTranscription: null });
     showView('welcome');
 }
 
@@ -349,8 +265,6 @@ function resetForNewSession() {
 document.addEventListener('DOMContentLoaded', () => {
     showView('welcome');
     $('#start-btn').addEventListener('click', startSession);
-    $('#mic-btn').addEventListener('click', toggleRecording);
-    $('#next-btn').addEventListener('click', handleNext);
-    $('#new-session-btn').addEventListener('click', resetForNewSession);
     $('#close-btn').addEventListener('click', handleClose);
+    $('#new-session-btn').addEventListener('click', resetForNewSession);
 });

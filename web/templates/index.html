@@ -3,148 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ADI/O — Reading Comprehension Therapy</title>
+    <title>ADI/O</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=League+Spartan:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=League+Spartan:wght@400;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
-    <!-- ============================================================ -->
-    <!-- WELCOME VIEW                                                  -->
-    <!-- ============================================================ -->
-    <div id="welcome-view" class="view">
-        <div class="welcome-page">
-            <img src="/static/images/adio_logo2.png" alt="ADI/O" class="welcome-logo">
-            <p class="welcome-subtitle">Reading Comprehension Therapy</p>
-
-            <div class="welcome-divider"></div>
-
-            <p class="welcome-body">
+    <!-- WELCOME -->
+    <div id="welcome-view" class="view"
+         style="width:100vw;height:100vh;background:#FFF6EF;">
+        <div style="background:#FFFFFF;border-radius:28px;padding:56px 48px;max-width:540px;width:100%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+            <img src="/static/images/adio_logo2.png" alt="ADI/O" style="height:120px;margin-bottom:12px;">
+            <p style="font-family:'League Spartan',sans-serif;font-weight:800;font-size:28px;color:#002248;margin-bottom:28px;">
+                Reading Comprehension Therapy
+            </p>
+            <p style="font-family:'Inter',sans-serif;font-weight:400;font-size:22px;color:#6b6b8a;line-height:1.7;margin-bottom:40px;">
                 You will be shown a picture and asked to describe what you see.
                 Speak your answers out loud &mdash; a friendly guide will listen
-                and help you notice more details, one step at a time.
+                and help you notice more details.
             </p>
-
-            <div class="welcome-steps">
-                <div class="welcome-step">
-                    <span class="step-num">1</span>
-                    <div>
-                        <strong>Look</strong>
-                        <p>Study the picture carefully.</p>
-                    </div>
-                </div>
-                <div class="welcome-step">
-                    <span class="step-num">2</span>
-                    <div>
-                        <strong>Speak</strong>
-                        <p>Answer the question with your voice.</p>
-                    </div>
-                </div>
-                <div class="welcome-step">
-                    <span class="step-num">3</span>
-                    <div>
-                        <strong>Learn</strong>
-                        <p>Receive warm, helpful guidance.</p>
-                    </div>
-                </div>
-            </div>
-
-            <button id="start-btn" class="btn-primary">
+            <button id="start-btn"
+                    style="background:#002251;color:#FFFFFF;font-family:'League Spartan',sans-serif;font-weight:800;font-size:28px;border:none;border-radius:16px;padding:20px 64px;cursor:pointer;">
                 Begin a Session
             </button>
-            <p class="welcome-hint">An image will be chosen for you.</p>
+            <p style="font-family:'Inter',sans-serif;font-size:20px;color:#6b6b8a;margin-top:18px;">
+                An image will be chosen for you.
+            </p>
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- SESSION VIEW                                                  -->
-    <!-- ============================================================ -->
-    <div id="session-view" class="view">
-        <header class="session-header">
-            <img src="/static/images/adio_logo2.png" alt="ADI/O" class="header-logo">
-            <span class="session-progress-label" id="progress-text">1/10</span>
-            <div class="progress-track">
-                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    <!-- SESSION -->
+    <div id="session-view" class="view"
+         style="width:100vw;height:100vh;background:#FFF6EF;padding:20px;box-sizing:border-box;">
+
+        <!-- Top Bar -->
+        <div style="display:flex;align-items:center;gap:16px;height:52px;flex-shrink:0;position:relative;overflow:visible;">
+            <img src="/static/images/adio_logo2.png" alt="ADI/O"
+                 style="height:150px;width:auto;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:10;pointer-events:none;">
+            <div style="width:160px;flex-shrink:0;"></div>
+            <div id="progress-track"
+                 style="flex:1;height:52px;background:#002248;border-radius:999px;display:flex;align-items:center;overflow:hidden;position:relative;">
+                <div id="progress-fill"
+                     style="position:absolute;left:0;top:0;bottom:0;background:#BFD62C;border-radius:999px;width:0%;transition:width 0.4s ease;"></div>
+                <span style="flex:1;"></span>
+                <span id="progress-text"
+                      style="position:relative;z-index:1;flex-shrink:0;min-width:80px;text-align:center;padding:0 18px;color:#FFFFFF;font-family:'League Spartan',sans-serif;font-weight:800;font-size:24px;">
+                    1/10
+                </span>
             </div>
-            <button id="close-btn" class="close-btn" title="End session">&times;</button>
-        </header>
+            <span id="close-btn"
+                  style="cursor:pointer;flex-shrink:0;color:#002248;font-family:'League Spartan',sans-serif;font-weight:800;font-size:52px;line-height:1;user-select:none;">
+                &times;
+            </span>
+        </div>
 
-        <main class="session-main">
-            <div class="session-layout">
-                <!-- Left: Image -->
-                <div class="image-panel">
-                    <div class="image-frame">
-                        <img id="session-image" src="" alt="Therapy image">
-                    </div>
-                </div>
-
-                <!-- Right: Interaction -->
-                <div class="interaction-panel">
-                    <!-- Transcription (shown after recording, positioned above question) -->
-                    <div id="transcription-area" class="hidden">
-                        <div class="transcription-card">
-                            <button id="mic-inline-btn" class="mic-inline-btn" title="Record again">
-                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
-                                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                                </svg>
-                            </button>
-                            <p id="transcription-text" class="transcription-text"></p>
-                        </div>
-                    </div>
-
-                    <!-- Question -->
-                    <div class="question-card" id="question-card">
-                        <p class="question-text" id="question-text"></p>
-                    </div>
-
-                    <!-- Mic (shown before recording) -->
-                    <div id="mic-section" class="mic-section">
-                        <button id="mic-btn" class="mic-btn" title="Click to record">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                            </svg>
-                        </button>
-                        <div id="waveform" class="waveform hidden">
-                            <span></span><span></span><span></span><span></span><span></span>
-                        </div>
-                        <span id="mic-label" class="mic-label">Tap to speak</span>
-                    </div>
-
-                    <!-- Feedback -->
-                    <div id="feedback-area" class="hidden"></div>
-
-                    <!-- Next -->
-                    <button id="next-btn" class="btn-next hidden">
-                        Next
-                    </button>
-                </div>
+        <!-- Body -->
+        <div style="display:flex;gap:16px;flex:1;min-height:0;margin-top:8px;">
+            <div style="flex:1;border-radius:14px;overflow:hidden;">
+                <img id="session-image" src="" alt=""
+                     style="width:100%;height:100%;object-fit:cover;display:block;">
             </div>
-        </main>
+            <div style="width:400px;flex-shrink:0;height:100%;display:flex;align-items:center;justify-content:center;">
+                <div id="sidebar-card" style="width:100%;"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- SUMMARY VIEW                                                  -->
-    <!-- ============================================================ -->
-    <div id="summary-view" class="view">
-        <div class="summary-page">
-            <img src="/static/images/adio_logo2.png" alt="ADI/O" class="summary-logo">
-            <h1 class="summary-title">Well Done!</h1>
-            <p id="summary-stats" class="summary-subtitle"></p>
-
-            <div class="summary-image-wrap">
-                <img id="summary-image" src="" alt="" class="summary-image">
+    <!-- SUMMARY -->
+    <div id="summary-view" class="view"
+         style="width:100vw;height:100vh;background:#FFF6EF;">
+        <div style="background:#FFFFFF;border-radius:28px;padding:48px 40px;max-width:600px;width:100%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.06);max-height:90vh;overflow-y:auto;">
+            <img src="/static/images/adio_logo2.png" alt="ADI/O" style="height:80px;margin-bottom:14px;">
+            <h1 style="font-family:'League Spartan',sans-serif;font-weight:800;font-size:48px;color:#002252;margin-bottom:8px;">Well Done!</h1>
+            <p id="summary-stats" style="font-family:'Inter',sans-serif;font-size:24px;color:#6b6b8a;margin-bottom:24px;"></p>
+            <div id="summary-image-wrap" style="margin-bottom:28px;">
+                <img id="summary-image" src="" alt="" style="width:100%;max-width:300px;border-radius:14px;">
             </div>
-
-            <div class="history-section">
-                <h2 class="section-heading">Your Answers</h2>
-                <div id="summary-history" class="history-list"></div>
-            </div>
-
-            <button id="new-session-btn" class="btn-primary">
+            <div id="summary-history" style="text-align:left;margin-bottom:28px;"></div>
+            <button id="new-session-btn"
+                    style="background:#002251;color:#FFFFFF;font-family:'League Spartan',sans-serif;font-weight:800;font-size:28px;border:none;border-radius:16px;padding:20px 64px;cursor:pointer;">
                 Start a New Session
             </button>
         </div>

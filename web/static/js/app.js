@@ -28,12 +28,12 @@ function showView(name) {
     $(`#${name}-view`).classList.add('active');
 }
 
-/* ---- Stars ---- */
+/* ---- Stars (rounded) ---- */
 function starsHTML(score) {
     let html = '<div style="display:flex;justify-content:center;gap:10px;margin-bottom:0;">';
     for (let i = 1; i <= 5; i++) {
         const fill = i <= score ? '#F71D73' : '#001543';
-        html += `<svg viewBox="0 0 24 24" width="44" height="44" xmlns="http://www.w3.org/2000/svg"><path d="${STAR_PATH}" fill="${fill}"/></svg>`;
+        html += `<svg viewBox="0 0 24 24" width="44" height="44" xmlns="http://www.w3.org/2000/svg"><path d="${STAR_PATH}" fill="${fill}" stroke="${fill}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
     }
     html += '</div>';
     return html;
@@ -57,11 +57,11 @@ function renderQuestionCard() {
     if (!q) return;
     const card = $('#sidebar-card');
     card.innerHTML = `
-        <div style="background:#FFDEE9;border:5px solid #EF1A6A;border-radius:22px;padding:16px 14px;">
+        <div style="background:#FFDEE9;border:5px solid #EF1A6A;border-radius:30px;padding:16px 14px;box-shadow:0 10px 0 #EF1A6A;">
             <p style="color:#002248;font-family:'League Spartan',sans-serif;font-weight:800;font-size:32px;text-align:center;line-height:1.35;margin:0 0 10px 0;">
                 ${q.text}
             </p>
-            <div style="background:#FFF6C1;border:5px solid #fbde28;border-radius:18px;padding:24px 20px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+            <div id="yellow-card" style="background:#FFF6C1;border:5px solid #fbde28;border-radius:26px;padding:24px 20px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 10px 0 #fbde28;transition:box-shadow 0.08s,transform 0.08s;">
                 <button id="mic-btn-inner"
                         style="width:160px;height:160px;border-radius:50%;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;overflow:hidden;">
                     ${MIC_IMG}
@@ -86,7 +86,7 @@ function renderFeedbackCard(result) {
 
     const card = $('#sidebar-card');
     card.innerHTML = `
-        <div style="background:#C8EFFF;border:5px solid #29A5E1;border-radius:22px;padding:28px 24px;text-align:center;">
+        <div style="background:#C8EFFF;border:5px solid #29A5E1;border-radius:30px;padding:28px 24px;text-align:center;box-shadow:0 10px 0 #29A5E1;">
             <p style="color:#002252;font-family:'League Spartan',sans-serif;font-weight:800;font-size:44px;margin:0 0 12px 0;">
                 ${heading}
             </p>
@@ -94,7 +94,7 @@ function renderFeedbackCard(result) {
             <p style="color:#002252;font-family:'Inter',sans-serif;font-weight:400;font-size:24px;text-align:center;line-height:1.55;margin:16px 0 24px 0;">
                 ${comment}
             </p>
-            <button id="next-btn-inner"
+            <button id="next-btn-inner" class="bevel-next"
                     style="background:#F3FFAD;border:5px solid #BCD533;border-radius:999px;padding:16px 0;width:80%;margin:0 auto;display:block;cursor:pointer;">
                 <span style="color:#101101;font-family:'League Spartan',sans-serif;font-weight:800;font-size:30px;">Next</span>
             </button>
@@ -154,6 +154,8 @@ async function startRecording() {
         state.isRecording = true;
         const btn = $('#mic-btn-inner');
         if (btn) btn.classList.add('mic-recording');
+        const yc = $('#yellow-card');
+        if (yc) { yc.style.boxShadow = '0 2px 0 #fbde28'; yc.style.transform = 'translateY(8px)'; }
         const lbl = $('#mic-label');
         if (lbl) lbl.textContent = 'Listening\u2026 tap to stop';
     } catch {
@@ -168,6 +170,8 @@ function stopRecording() {
         state.isRecording = false;
         const btn = $('#mic-btn-inner');
         if (btn) { btn.classList.remove('mic-recording'); btn.style.opacity = '0.5'; btn.style.cursor = 'wait'; }
+        const yc = $('#yellow-card');
+        if (yc) { yc.style.boxShadow = '0 10px 0 #fbde28'; yc.style.transform = 'translateY(0)'; }
         const lbl = $('#mic-label');
         if (lbl) lbl.textContent = 'Processing\u2026';
     }

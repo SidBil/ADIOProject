@@ -16,7 +16,7 @@ body {
 #session-view.active { flex-direction:column; gap:16px; }
 #summary-view.active { align-items:center; justify-content:center; }
 
-/* Recording pulse — only animation in the app */
+/* Recording pulse */
 @keyframes rec-pulse {
     0%   { box-shadow: 0 0 0 0 rgba(239,26,106,0.35); }
     70%  { box-shadow: 0 0 0 12px rgba(239,26,106,0); }
@@ -25,6 +25,16 @@ body {
 
 .mic-recording {
     animation: rec-pulse 1.2s infinite;
+}
+
+/* 3D bevel — next button */
+.bevel-next {
+    box-shadow: 0 10px 0 #BCD533;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.bevel-next:active {
+    box-shadow: 0 2px 0 #BCD533;
+    transform: translateY(8px);
 }
 
 /* Summary history items */

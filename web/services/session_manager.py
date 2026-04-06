@@ -12,9 +12,9 @@ import random
 from pathlib import Path
 from dataclasses import dataclass, field
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-IMAGE_DIR = PROJECT_ROOT / "imagegen" / "images"
-METADATA_CSV = PROJECT_ROOT / "imagegen" / "image_metadata.csv"
+WEB_ROOT = Path(__file__).resolve().parent.parent
+IMAGE_DIR = WEB_ROOT / "data" / "images"
+METADATA_CSV = WEB_ROOT / "data" / "image_metadata.csv"
 
 STRUCTURE_WORDS = [
     "who", "what", "where", "color", "shape",

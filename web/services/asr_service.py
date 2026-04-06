@@ -13,12 +13,13 @@ from pathlib import Path
 from transformers import WhisperProcessor, WhisperForConditionalGeneration, CLIPModel, CLIPProcessor
 from peft import PeftModel
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+WEB_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = WEB_ROOT.parent
 
 DEFAULT_WHISPER_MODEL = "openai/whisper-small"
 DEFAULT_LORA_PATH = PROJECT_ROOT / "asr" / "finetuned-whsiper-lora"
 DEFAULT_CLIP_MODEL = "openai/clip-vit-base-patch32"
-DEFAULT_CACHE_PATH = PROJECT_ROOT / "multimodal" / "cache" / "clip_image_embeddings.npz"
+DEFAULT_CACHE_PATH = WEB_ROOT / "data" / "cache" / "clip_image_embeddings.npz"
 
 
 def _pick_device() -> str:

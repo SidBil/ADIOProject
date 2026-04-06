@@ -12,12 +12,9 @@ from pathlib import Path
 from openai import OpenAI
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+WEB_ROOT = Path(__file__).resolve().parent.parent
 
-for env_path in [PROJECT_ROOT / ".env", PROJECT_ROOT / "imagegen" / ".env"]:
-    if env_path.exists():
-        load_dotenv(env_path)
-        break
+load_dotenv(WEB_ROOT / ".env")
 
 
 class LLMService:

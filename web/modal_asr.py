@@ -14,6 +14,7 @@ CLIP_MODEL = "openai/clip-vit-base-patch32"
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
+    .apt_install("ffmpeg")
     .pip_install(
         "torch", "torchaudio",
         "transformers==4.51.3", "peft", "accelerate",
@@ -84,11 +85,27 @@ class ASRModel:
                    alpha: float = 0.3, num_beams: int = 5) -> dict:
         import re
         import io
+        import subprocess
+        import tempfile
         import torch
         import numpy as np
         import soundfile as sf
 
-        audio_array, sr = sf.read(io.BytesIO(audio_bytes))
+        try:
+            audio_array, sr = sf.read(io.BytesIO(audio_bytes))
+        except Exception:
+            with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
+                tmp_in.write(audio_bytes)
+                tmp_in_path = tmp_in.name
+            tmp_out_path = tmp_in_path.replace(".webm", ".wav")
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", tmp_in_path, "-ar", "16000", "-ac", "1", tmp_out_path],
+                capture_output=True, check=True,
+            )
+            audio_array, sr = sf.read(tmp_out_path)
+            import os
+            os.unlink(tmp_in_path)
+            os.unlink(tmp_out_path)
 
         input_features = self.whisper_processor(
             audio_array, sampling_rate=sr, return_tensors="pt"

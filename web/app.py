@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from services.asr_service import ASRService
+from services.asr_service import ASRService, MODAL_ASR_URL
 from services.llm_service import LLMService
 from services.session_manager import SessionManager, IMAGE_DIR
 
@@ -140,9 +140,22 @@ async def transcribe(session_id: str, audio: UploadFile = File(...)):
     if not session:
         raise HTTPException(404, "Session not found")
 
+    content = await audio.read()
+
+    if MODAL_ASR_URL:
+        try:
+            result = asr.transcribe_remote_bytes(
+                content,
+                content_type=audio.content_type or "audio/webm",
+                image_id=session.image_id,
+            )
+        except Exception:
+            traceback.print_exc()
+            raise HTTPException(500, "Transcription failed")
+        return result
+
     suffix = ".webm" if "webm" in (audio.content_type or "") else ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        content = await audio.read()
         tmp.write(content)
         tmp_path = tmp.name
 

@@ -90,6 +90,19 @@ class ASRService:
             return self._transcribe_remote(audio_path, image_id, alpha)
         return self._transcribe_local(audio_path, image_id, alpha, num_beams)
 
+    def transcribe_remote_bytes(self, audio_bytes: bytes, content_type: str = "audio/webm",
+                                image_id: str | None = None, alpha: float = 0.3) -> dict:
+        """Send raw audio bytes (any format) to Modal — no local ffmpeg needed."""
+        ext = "webm" if "webm" in content_type else "wav"
+        files = {"audio": (f"recording.{ext}", audio_bytes, content_type)}
+        data = {"alpha": str(alpha)}
+        if image_id:
+            data["image_id"] = image_id
+
+        resp = requests.post(MODAL_ASR_URL, files=files, data=data, timeout=90)
+        resp.raise_for_status()
+        return resp.json()
+
     def _transcribe_remote(self, audio_path: str | Path, image_id: str | None,
                            alpha: float) -> dict:
         with open(str(audio_path), "rb") as f:

@@ -1,0 +1,71 @@
+/* ADI/O — minimal CSS, most styling is inline per spec */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow: hidden; }
+
+body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+}
+
+.view { display: none !important; }
+.view.active { display: flex !important; }
+
+#welcome-view.active { align-items:center; justify-content:center; }
+#session-view.active { flex-direction:column; gap:16px; }
+#summary-view.active { align-items:center; justify-content:center; }
+
+/* Recording pulse */
+@keyframes rec-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(239,26,106,0.35); }
+    70%  { box-shadow: 0 0 0 12px rgba(239,26,106,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,26,106,0); }
+}
+
+.mic-recording {
+    animation: rec-pulse 1.2s infinite;
+}
+
+/* 3D bevel — next button */
+.bevel-next {
+    box-shadow: 0 10px 0 #BCD533;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.bevel-next:active {
+    box-shadow: 0 2px 0 #BCD533;
+    transform: translateY(8px);
+}
+
+/* Summary history items */
+.history-item {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.history-item p {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    color: #002252;
+    line-height: 1.5;
+}
+
+.history-item .h-q {
+    font-family: 'League Spartan', sans-serif;
+    font-weight: 800;
+    font-size: 24px;
+    color: #002248;
+    margin-bottom: 6px;
+}
+
+.history-item .h-fb {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e8e8f0;
+    font-style: italic;
+    color: #29A5E1;
+}

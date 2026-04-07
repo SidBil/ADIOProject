@@ -11,6 +11,7 @@ dynamic follow-up question generation.
 Run: python app.py
 """
 
+import os
 import tempfile
 import traceback
 from contextlib import asynccontextmanager
@@ -47,8 +48,11 @@ app = FastAPI(title="ADI/O Therapy", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
-WEB_DIR = Path(__file__).resolve().parent
-app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+WEB_DIR = Path(os.environ.get("WEB_DIR", Path(__file__).resolve().parent))
+try:
+    app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Request / response schemas

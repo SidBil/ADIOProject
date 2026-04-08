@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -10,19 +10,45 @@ import {
 } from "react-native";
 import { colors, fonts } from "../theme";
 import { getSummary, imageUrl } from "../api";
+import { supabase } from "../lib/supabase";
 
 interface Props {
   sessionId: string;
+  imageId?: string;
+  userId: string;
   onNewSession: () => void;
 }
 
-export default function SummaryScreen({ sessionId, onNewSession }: Props) {
+export default function SummaryScreen({
+  sessionId,
+  imageId,
+  userId,
+  onNewSession,
+}: Props) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const saved = useRef(false);
 
   useEffect(() => {
     getSummary(sessionId)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        if (!saved.current) {
+          saved.current = true;
+          supabase
+            .from("sessions")
+            .insert({
+              user_id: userId,
+              session_id: sessionId,
+              image_id: imageId || d.image_id || null,
+              questions_answered: d.progress?.answered ?? 0,
+              total_questions: d.progress?.total ?? 0,
+            })
+            .then(({ error: insertErr }) => {
+              if (insertErr) console.warn("Failed to save session:", insertErr.message);
+            });
+        }
+      })
       .catch((e) => setError(e.message));
   }, [sessionId]);
 
@@ -75,7 +101,7 @@ export default function SummaryScreen({ sessionId, onNewSession }: Props) {
             />
           )}
 
-          {history.map((item, idx) => {
+          {history.map((item: any, idx: number) => {
             const fb = item.followup || item.evaluation?.feedback || "";
             return (
               <View key={idx} style={styles.historyItem}>

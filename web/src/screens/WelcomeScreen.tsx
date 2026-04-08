@@ -11,9 +11,11 @@ import { colors, fonts } from "../theme";
 
 interface Props {
   onStart: () => Promise<void>;
+  onHistory?: () => void;
+  onSignOut?: () => void;
 }
 
-export default function WelcomeScreen({ onStart }: Props) {
+export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handlePress = async () => {
@@ -29,6 +31,11 @@ export default function WelcomeScreen({ onStart }: Props) {
 
   return (
     <View style={styles.container}>
+      {onSignOut && (
+        <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.card}>
         <Image
           source={require("../../assets/adio_logo2.png")}
@@ -53,6 +60,17 @@ export default function WelcomeScreen({ onStart }: Props) {
             <Text style={styles.btnText}>Begin a Session</Text>
           )}
         </TouchableOpacity>
+
+        {onHistory && (
+          <TouchableOpacity
+            style={styles.historyBtn}
+            onPress={onHistory}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.historyBtnText}>View Past Sessions</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.hint}>An image will be chosen for you.</Text>
       </View>
     </View>
@@ -66,6 +84,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
+  },
+  signOutBtn: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  signOutText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.textMuted,
   },
   card: {
     backgroundColor: colors.cardWhite,
@@ -107,6 +137,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
     fontSize: 22,
     color: colors.white,
+  },
+  historyBtn: {
+    borderWidth: 2,
+    borderColor: colors.blueBorder,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+    marginBottom: 12,
+  },
+  historyBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
+    color: colors.blueBorder,
   },
   hint: {
     fontFamily: fonts.body,

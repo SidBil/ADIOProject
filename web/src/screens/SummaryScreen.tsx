@@ -35,6 +35,15 @@ export default function SummaryScreen({
         setData(d);
         if (!saved.current) {
           saved.current = true;
+          const history = (d.qa_history || []).map((item: any) => ({
+            question: item.question,
+            structure_word: item.structure_word,
+            expected_answer: item.expected_answer,
+            transcription: item.transcription,
+            evaluation: item.evaluation,
+            followup: item.followup,
+          }));
+
           supabase
             .from("sessions")
             .insert({
@@ -43,6 +52,7 @@ export default function SummaryScreen({
               image_id: imageId || d.image_id || null,
               questions_answered: d.progress?.answered ?? 0,
               total_questions: d.progress?.total ?? 0,
+              qa_history: history,
             })
             .then(({ error: insertErr }) => {
               if (insertErr) console.warn("Failed to save session:", insertErr.message);

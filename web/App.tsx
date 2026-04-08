@@ -39,16 +39,17 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, s: Session | null) => {
+        setUser(s?.user ?? null);
+        setAuthReady(true);
+      }
+    );
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setUser(s?.user ?? null);
       setAuthReady(true);
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s: Session | null) => {
-        setUser(s?.user ?? null);
-      }
-    );
 
     return () => subscription.unsubscribe();
   }, []);

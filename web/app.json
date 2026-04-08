@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ADI/O Therapy",
+    "name": "Adio",
     "slug": "adio-therapy",
     "version": "1.0.0",
     "orientation": "default",
@@ -24,7 +24,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon-02.png"
     },
     "plugins": [
       "expo-font",

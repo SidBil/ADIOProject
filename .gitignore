@@ -218,8 +218,18 @@ multimodal/cache/
 asr/whisper-lora-final/
 asr/finetuned-whsiper-lora/
 
+# Legacy web app (V1)
+webV1/
+
 # Web app temp files
 web/static/audio/
+
+# Node
+node_modules/
+
+# Expo
+.expo/
+web-build/
 
 # macOS
 .DS_Store

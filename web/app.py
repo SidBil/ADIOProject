@@ -19,8 +19,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -49,10 +48,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 
 WEB_DIR = Path(os.environ.get("WEB_DIR", Path(__file__).resolve().parent))
-try:
-    app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
-except Exception:
-    pass
 
 # ---------------------------------------------------------------------------
 # Request / response schemas
@@ -68,11 +63,6 @@ class EvaluateRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
-
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    return (WEB_DIR / "templates" / "index.html").read_text()
-
 
 @app.get("/images/{filename}")
 async def serve_image(filename: str):

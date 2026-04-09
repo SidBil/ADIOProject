@@ -59,6 +59,20 @@ export async function getSummary(sessionId: string) {
   return res.json();
 }
 
+export async function speakTTS(text: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.onended = () => URL.revokeObjectURL(url);
+  await audio.play();
+}
+
 export function imageUrl(path: string) {
   return `${API_BASE}${path}`;
 }

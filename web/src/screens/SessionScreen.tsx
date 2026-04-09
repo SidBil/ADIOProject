@@ -12,9 +12,8 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Audio } from "expo-av";
-import * as Speech from "expo-speech";
 import { colors, fonts } from "../theme";
-import { imageUrl, transcribeAudio, evaluate, endSession } from "../api";
+import { imageUrl, transcribeAudio, evaluate, endSession, speakTTS } from "../api";
 import Stars from "../components/Stars";
 import ShapePattern from "../components/ShapePattern";
 import useVolumeMeter from "../hooks/useVolumeMeter";
@@ -155,7 +154,7 @@ export default function SessionScreen({
 
       const comment = eData.followup || eData.evaluation?.feedback || "";
       if (comment) {
-        Speech.speak(comment, { language: "en-US", rate: 0.9 });
+        speakTTS(comment).catch(() => {});
       }
     } catch (err: any) {
       showAlert("Error", err.message);

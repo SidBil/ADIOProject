@@ -19,9 +19,10 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from openai import OpenAI
 
 from services.asr_service import ASRService, MODAL_ASR_URL
 from services.llm_service import LLMService
@@ -59,6 +60,9 @@ class StartRequest(BaseModel):
 class EvaluateRequest(BaseModel):
     session_id: str
     transcription: str
+
+class TTSRequest(BaseModel):
+    text: str
 
 # ---------------------------------------------------------------------------
 # Pages
@@ -260,6 +264,32 @@ async def session_summary(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
     return session.summary()
+
+
+# ---------------------------------------------------------------------------
+# Text-to-Speech (OpenAI TTS)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/tts")
+async def text_to_speech(req: TTSRequest):
+    if not req.text.strip():
+        raise HTTPException(400, "Empty text")
+    try:
+        client = OpenAI()
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="nova",
+            input=req.text,
+            response_format="mp3",
+        )
+        return StreamingResponse(
+            response.iter_bytes(),
+            media_type="audio/mpeg",
+            headers={"Content-Type": "audio/mpeg"},
+        )
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(500, "TTS generation failed")
 
 
 # ---------------------------------------------------------------------------

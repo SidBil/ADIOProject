@@ -55,7 +55,7 @@ export default function LoginScreen({ onAuth }: Props) {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: Platform.OS === "web" ? window.location.origin + "/" : undefined,
+        redirectTo: Platform.OS === "web" ? window.location.origin : undefined,
       },
     });
     setLoading(false);

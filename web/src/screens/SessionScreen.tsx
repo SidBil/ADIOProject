@@ -335,11 +335,19 @@ function QuestionCard({
             style={qStyles.micWrap}
             onLayout={handleMicLayout}
           >
-            <Image
-              source={require("../../assets/micV3.png")}
-              style={qStyles.micImage}
-              resizeMode="contain"
-            />
+            {isProcessing ? (
+              <Image
+                source={require("../../assets/spinner.gif")}
+                style={{ width: 150, height: 150 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Image
+                source={require("../../assets/micV3.png")}
+                style={qStyles.micImage}
+                resizeMode="contain"
+              />
+            )}
           </View>
         </TouchableOpacity>
         <Text style={qStyles.micLabel}>{label}</Text>

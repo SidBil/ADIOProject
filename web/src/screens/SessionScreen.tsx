@@ -193,7 +193,7 @@ export default function SessionScreen({
 
   return (
     <View style={styles.container}>
-      <ShapePattern volume={volume} burst={burstCount} cardCenter={micCenter} />
+      <ShapePattern volume={volume} burst={burstCount} cardCenter={micCenter} swirl={isProcessing} />
       {/* ─── Top Bar ─── */}
       <View style={styles.topBar}>
         <Image

@@ -17,6 +17,10 @@ const BURST_PUSH = 38;
 const BURST_WIDTH = 180;
 const BURST_LIFE = 1.3;
 
+const SWIRL_SPEED = 1.2;
+const SWIRL_PUSH = 14;
+const SWIRL_SCALE_AMP = 0.15;
+
 type ST = "circle" | "triangle" | "star";
 const ORDER: ST[] = ["circle", "star", "triangle", "star", "circle", "triangle"];
 
@@ -42,20 +46,24 @@ interface Props {
   volume?: number;
   burst?: number;
   cardCenter?: { x: number; y: number };
+  swirl?: boolean;
 }
 
-export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Props) {
+export default function ShapePattern({ volume = 0, burst = 0, cardCenter, swirl = false }: Props) {
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const phaseRef = useRef(0);
+  const swirlPhaseRef = useRef(0);
   const smoothVolRef = useRef(0);
   const lastFrameRef = useRef(0);
   const animatingRef = useRef(false);
   const volumeRef = useRef(0);
+  const swirlRef = useRef(false);
   const burstsRef = useRef<BurstRing[]>([]);
   const lastBurstRef = useRef(0);
   const [, forceRender] = useState(0);
 
   volumeRef.current = volume;
+  swirlRef.current = swirl;
 
   useEffect(() => {
     if (burst > lastBurstRef.current) {
@@ -82,6 +90,7 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Prop
     }
 
     phaseRef.current += dt * WAVE_SPEED;
+    swirlPhaseRef.current += dt * SWIRL_SPEED;
 
     burstsRef.current = burstsRef.current
       .map((b) => ({ radius: b.radius + dt * BURST_SPEED, age: b.age + dt }))
@@ -89,8 +98,9 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Prop
 
     const hasVolume = smoothVolRef.current > 0.003;
     const hasBursts = burstsRef.current.length > 0;
+    const hasSwirl = swirlRef.current;
 
-    if (!hasVolume && !hasBursts) {
+    if (!hasVolume && !hasBursts && !hasSwirl) {
       smoothVolRef.current = 0;
       animatingRef.current = false;
       forceRender((n) => n + 1);
@@ -102,12 +112,12 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Prop
   }, []);
 
   useEffect(() => {
-    if (volume > 0.01 && !animatingRef.current) {
+    if ((volume > 0.01 || swirl) && !animatingRef.current) {
       animatingRef.current = true;
       lastFrameRef.current = performance.now();
       requestAnimationFrame(loop);
     }
-  }, [volume, loop]);
+  }, [volume, swirl, loop]);
 
   useEffect(() => {
     return () => { animatingRef.current = false; };
@@ -123,7 +133,9 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Prop
   const center = cardCenter || { x: dims.w * 0.5, y: dims.h * 0.5 };
   const vol = animatingRef.current ? smoothVolRef.current : 0;
   const phase = phaseRef.current;
+  const swirlPhase = swirlPhaseRef.current;
   const bursts = burstsRef.current;
+  const isSwirling = swirl;
 
   return (
     <View
@@ -169,6 +181,22 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter }: Prop
                   pushX += Math.cos(angle) * push;
                   pushY += Math.sin(angle) * push;
                   sc += inRing * fade * 0.45;
+                }
+
+                // Swirl: orbit shapes around the center
+                if (isSwirling && dist > 5) {
+                  const swirlAngle = swirlPhase + dist * 0.008;
+                  const distFade = Math.exp(-dist / 500);
+                  const tangentX = -Math.sin(angle);
+                  const tangentY = Math.cos(angle);
+                  const swirlAmt = SWIRL_PUSH * Math.sin(swirlAngle) * distFade;
+                  pushX += tangentX * swirlAmt;
+                  pushY += tangentY * swirlAmt;
+                  // Gentle radial breathing
+                  const breathe = Math.sin(swirlPhase * 2 + dist * 0.01) * SWIRL_PUSH * 0.3 * distFade;
+                  pushX += Math.cos(angle) * breathe;
+                  pushY += Math.sin(angle) * breathe;
+                  sc += SWIRL_SCALE_AMP * Math.sin(swirlAngle * 1.5) * distFade;
                 }
 
                 return (

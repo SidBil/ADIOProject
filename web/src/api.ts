@@ -60,17 +60,17 @@ export async function getSummary(sessionId: string) {
 }
 
 export async function speakTTS(text: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/tts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
-  if (!res.ok) return;
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
+  const url = `${API_BASE}/api/tts?text=${encodeURIComponent(text)}`;
   const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
-  await audio.play();
+  // Re-use the onended clean-up if needed, though with GET it's less critical
+  // but good for consistency if we ever switch back to object URLs.
+  
+  try {
+    // audio.play() returns a promise that resolves when playback starts
+    await audio.play();
+  } catch (err) {
+    console.error("TTS Playback failed:", err);
+  }
 }
 
 export function imageUrl(path: string) {

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Platform,
   Alert,
   ScrollView,
@@ -145,17 +146,19 @@ export default function SessionScreen({
 
       const eData = await evaluate(session.session_id, transcription);
 
+      // Pre-calculate comment to wait for it before showing feedback card
+      const comment = eData.followup || eData.evaluation?.feedback || "";
+      if (comment) {
+        // This now waits until the audio actually starts playing
+        await speakTTS(comment).catch(() => {});
+      }
+
       setFeedbackData(eData);
       onUpdateSession({
         question: eData.next_question,
         progress: eData.progress,
       });
       setCardState("feedback");
-
-      const comment = eData.followup || eData.evaluation?.feedback || "";
-      if (comment) {
-        speakTTS(comment).catch(() => {});
-      }
     } catch (err: any) {
       showAlert("Error", err.message);
     } finally {
@@ -296,6 +299,16 @@ function QuestionCard({
   onMicLayout?: (center: { x: number; y: number }) => void;
 }) {
   const micRef = useRef<View>(null);
+  const pressAnim = useRef(new Animated.Value(pressed ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(pressAnim, {
+      toValue: pressed ? 1 : 0,
+      duration: 150,
+      easing: Easing.inOut(Easing.sin),
+      useNativeDriver: false,
+    }).start();
+  }, [pressed]);
 
   if (!question) return null;
 
@@ -315,13 +328,51 @@ function QuestionCard({
     }
   };
 
+  // On web, use CSS transition with cubic-bezier approximating sine ease
+  const webTransitionStyle = Platform.OS === "web" ? {
+    transition: "transform 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95), box-shadow 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95)",
+    boxShadow: pressed
+      ? `0px 0px 0px ${colors.yellowBorder}`
+      : `0px 10px 0px ${colors.yellowBorder}`,
+    transform: pressed ? "translateY(10px)" : "translateY(0px)",
+  } as any : undefined;
+
+  // On native, use the Animated values
+  const nativeAnimStyle = Platform.OS !== "web" ? {
+    transform: [
+      {
+        translateY: pressAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 10],
+        }),
+      },
+    ],
+    shadowOffset: {
+      width: 0,
+      height: pressAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [10, 0],
+      }) as unknown as number,
+    },
+    shadowOpacity: pressAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 0],
+    }),
+    elevation: pressAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [6, 0],
+    }),
+  } : undefined;
+
   return (
     <View style={qStyles.pinkCard}>
       <Text style={qStyles.questionText}>{question.text}</Text>
-      <View
+      <Animated.View
         style={[
           qStyles.yellowCard,
-          pressed && qStyles.yellowCardPressed,
+          Platform.OS === "web" ? qStyles.yellowCardNoShadow : undefined,
+          nativeAnimStyle,
+          webTransitionStyle,
         ]}
       >
         <TouchableOpacity
@@ -351,7 +402,7 @@ function QuestionCard({
           </View>
         </TouchableOpacity>
         <Text style={qStyles.micLabel}>{label}</Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -398,6 +449,12 @@ const qStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
     transform: [{ translateY: 10 }],
+    elevation: 0,
+  },
+  yellowCardNoShadow: {
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
     elevation: 0,
   },
   micBtn: { alignItems: "center" },

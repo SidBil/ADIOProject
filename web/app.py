@@ -272,14 +272,23 @@ async def session_summary(session_id: str):
 
 @app.post("/api/tts")
 async def text_to_speech(req: TTSRequest):
-    if not req.text.strip():
+    return await _generate_tts(req.text)
+
+
+@app.get("/api/tts")
+async def text_to_speech_get(text: str):
+    return await _generate_tts(text)
+
+
+async def _generate_tts(text: str):
+    if not text.strip():
         raise HTTPException(400, "Empty text")
     try:
         client = OpenAI()
         response = client.audio.speech.create(
             model="tts-1",
             voice="nova",
-            input=req.text,
+            input=text,
             response_format="mp3",
         )
         return StreamingResponse(

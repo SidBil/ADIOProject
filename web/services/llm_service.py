@@ -70,6 +70,20 @@ IMPORTANT CONSTRAINTS:
   of "their"). Be forgiving of these — evaluate the meaning, not the surface text.
 - Keep feedback to exactly 1-2 sentences. Be warm and encouraging.
 
+CRITICAL — HANDLING OPEN-ENDED QUESTIONS:
+- The "expected answer" is ONE POSSIBLE correct response, NOT the only valid answer.
+- For open-ended questions (especially about sound, mood, movement, or "what is
+  happening"), many different answers can be equally valid.
+- Evaluate based on whether the child's response is REASONABLE given what is actually
+  in the image (use the entities and actions provided). Do NOT penalize them just
+  because their answer differs from the expected answer.
+- For example, if the expected answer is "quiet park sounds" but the child says
+  "people playing and laughing," that is a valid interpretation and should score well.
+- Only penalize for responses that are clearly unrelated to the image content or
+  factually impossible given the scene.
+- For FACTUAL questions (color, number, who), the expected answer is more authoritative
+  — but still be forgiving of partial answers.
+
 Return ONLY valid JSON in this exact format:
 {
   "scores": {
@@ -88,23 +102,34 @@ Even partial or unclear answers deserve acknowledgment for the attempt.
 
 --- EXAMPLES ---
 
-Example 1:
+Example 1 (factual question — strict matching):
 Question: "What color is the umbrella?"
 Expected: "The umbrella is bright red."
+Entities: child; umbrella; rain
 Child said: "its red"
 Result:
 {"scores":{"accuracy":5,"detail":3,"clarity":4,"relevance":5},"feedback":"Great job! You noticed the red umbrella! Can you tell me more about it — is it big or small?","missed_elements":["bright"],"overall_score":4}
 
-Example 2:
-Question: "Who is in the picture?"
-Expected: "A boy and his mother are walking together."
-Child said: "um a boy and a lady they are walking"
+Example 2 (open-ended question — accept reasonable answers):
+Question: "If you were in this scene, what sounds might you hear?"
+Expected: "quiet park sounds"
+Entities: robot; flower; bench
+Child said: "um maybe birds and like wind blowing"
 Result:
-{"scores":{"accuracy":4,"detail":4,"clarity":4,"relevance":5},"feedback":"Wonderful! You saw the boy and the lady walking together. What do you think they might be doing?","missed_elements":["mother specifically"],"overall_score":4}
+{"scores":{"accuracy":5,"detail":4,"clarity":4,"relevance":5},"feedback":"I love that! Birds singing and wind blowing are great sounds you might hear in a park. What else might be quiet or peaceful there?","missed_elements":[],"overall_score":5}
 
-Example 3:
+Example 3 (open-ended question — different but valid interpretation):
+Question: "What mood or feeling does this picture give you?"
+Expected: "sad or thoughtful"
+Entities: boy; rain; window
+Child said: "its cozy because hes inside and its raining"
+Result:
+{"scores":{"accuracy":4,"detail":4,"clarity":5,"relevance":5},"feedback":"What a thoughtful answer! Being inside while it rains can definitely feel cozy. What about the boy's face — does he look happy or more thoughtful?","missed_elements":[],"overall_score":5}
+
+Example 4 (child gives unrelated answer):
 Question: "What is the dog doing?"
 Expected: "The brown dog is running through the grass."
+Entities: dog; ball; trees; grass
 Child said: "the dog is like running i think"
 Result:
 {"scores":{"accuracy":4,"detail":2,"clarity":3,"relevance":5},"feedback":"Yes, the dog is running! What color is the dog, and where is it running?","missed_elements":["brown","through the grass"],"overall_score":3}
@@ -115,10 +140,13 @@ Do not include any text outside the JSON object."""
 
         user = f"""Question asked: "{question}"
 Structure word focus: {structure_word}
-Expected answer: "{expected_answer}"
-Image context: entities={entities}, actions={actions}
+Expected answer (one possible correct response): "{expected_answer}"
 
-Child's response (ASR transcription): "{transcription}"
+Image contents — use this as your primary reference for what is valid:
+  Entities in image: {entities}
+  Actions in image: {actions}
+
+Child's response (ASR transcription, no caps/punctuation): "{transcription}"
 
 Evaluate this response. Return ONLY the JSON object."""
 
@@ -143,6 +171,9 @@ IMPORTANT CONSTRAINTS:
   impossible in this context.
 - Your follow-up question must be something the child can answer VERBALLY.
 - Keep language simple, warm, and age-appropriate (roughly ages 5-10). No clinical jargon.
+- For open-ended questions (mood, sound, movement), remember that the child's original
+  answer may have been valid even if it differed from the expected answer. Focus on
+  encouraging MORE detail, not correcting them toward one specific answer.
 
 Generate a JSON object:
 {
@@ -166,6 +197,13 @@ Child said: "i dont know"
 Score: 1/5
 Result:
 {"comment":"That's okay! Let's try together. Take another look at the flowers in the picture.","suggested_question":"Do the flowers look more red, or more yellow?","structure_word":"color"}
+
+Example 3:
+Original question: "What sounds might you hear in this scene?"
+Child said: "um loud"
+Score: 2/5
+Result:
+{"comment":"Interesting! You think it might be loud. Let's think about what could be making those sounds.","suggested_question":"What things in the picture might be making noise?","structure_word":"sound"}
 
 --- END EXAMPLES ---
 

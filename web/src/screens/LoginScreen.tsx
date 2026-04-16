@@ -1,18 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Image,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  Animated,
+  Easing,
+  Pressable,
 } from "react-native";
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
+import ShapePattern from "../components/ShapePattern";
 
 interface Props {
   onAuth: () => void;
@@ -25,7 +28,14 @@ export default function LoginScreen({ onAuth }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleEmailAuth() {
+  const [burstCount, setBurstCount] = useState(0);
+  const [clickCenter, setClickCenter] = useState<{ x: number; y: number } | undefined>();
+
+  async function handleEmailAuth(e: any) {
+    if (e?.nativeEvent) {
+      setClickCenter({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+      setBurstCount((c) => c + 1);
+    }
     if (!email.trim() || !password.trim()) {
       setError("Please enter email and password.");
       return;
@@ -49,7 +59,11 @@ export default function LoginScreen({ onAuth }: Props) {
     }
   }
 
-  async function handleGoogleAuth() {
+  async function handleGoogleAuth(e: any) {
+    if (e?.nativeEvent) {
+      setClickCenter({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+      setBurstCount((c) => c + 1);
+    }
     setLoading(true);
     setError(null);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -62,11 +76,21 @@ export default function LoginScreen({ onAuth }: Props) {
     if (oauthError) setError(oauthError.message);
   }
 
+  function handleSwitch(e: any) {
+    if (e?.nativeEvent) {
+      setClickCenter({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+      setBurstCount((c) => c + 1);
+    }
+    setIsSignUp(!isSignUp);
+    setError(null);
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <ShapePattern burst={burstCount} cardCenter={clickCenter} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -102,20 +126,14 @@ export default function LoginScreen({ onAuth }: Props) {
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <TouchableOpacity
-            style={styles.primaryBtn}
+          <Button3D
+            title={isSignUp ? "Sign Up" : "Sign In"}
             onPress={handleEmailAuth}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.primaryBtnText}>
-                {isSignUp ? "Sign Up" : "Sign In"}
-              </Text>
-            )}
-          </TouchableOpacity>
+            loading={loading}
+            topColor={colors.blueCard}
+            bottomColor={colors.blueBorder}
+            textColor={colors.darkBlue}
+          />
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
@@ -123,28 +141,26 @@ export default function LoginScreen({ onAuth }: Props) {
             <View style={styles.dividerLine} />
           </View>
 
-          <TouchableOpacity
-            style={styles.googleBtn}
+          <Button3D
+            title="Sign in with Google"
             onPress={handleGoogleAuth}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.googleBtnText}>Sign in with Google</Text>
-          </TouchableOpacity>
+            loading={loading}
+            topColor={colors.greenBtn}
+            bottomColor={colors.greenBorder}
+            textColor={colors.darkBlue}
+          />
 
-          <TouchableOpacity
-            onPress={() => {
-              setIsSignUp(!isSignUp);
-              setError(null);
-            }}
+          <Pressable
+            onPress={handleSwitch}
             style={styles.switchRow}
+            hitSlop={10}
           >
             <Text style={styles.switchText}>
               {isSignUp
                 ? "Already have an account? Sign In"
                 : "Don't have an account? Sign Up"}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -169,13 +185,20 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    borderWidth: 5,
+    borderColor: "#d8d8d8",
+    shadowColor: "#d8d8d8",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
-  logo: { height: 70, width: 180, marginBottom: 10 },
+  logo: { 
+    height: 180, 
+    width: 320, 
+    marginTop: -40, 
+    marginBottom: -25 
+  },
   title: {
     fontFamily: fonts.heading,
     fontSize: 28,
@@ -185,16 +208,16 @@ const styles = StyleSheet.create({
   },
   input: {
     width: "100%",
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: "#e0e0e8",
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
     fontFamily: fonts.body,
-    fontSize: 16,
+    fontSize: 17,
     color: colors.darkBlueText,
-    marginBottom: 12,
-    backgroundColor: "#fafafe",
+    marginBottom: 14,
+    backgroundColor: "#ffffff",
   },
   errorText: {
     fontFamily: fonts.body,
@@ -230,30 +253,105 @@ const styles = StyleSheet.create({
   dividerText: {
     fontFamily: fonts.body,
     fontSize: 14,
-    color: colors.textMuted,
+    color: colors.darkBlue,
     marginHorizontal: 14,
   },
-  googleBtn: {
-    borderWidth: 2,
-    borderColor: "#e0e0e8",
-    borderRadius: 14,
-    paddingVertical: 14,
-    width: "100%",
-    alignItems: "center",
-    backgroundColor: colors.cardWhite,
-  },
-  googleBtnText: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 16,
-    color: colors.darkBlueText,
-  },
   switchRow: {
-    marginTop: 18,
+    marginTop: 22,
   },
   switchText: {
     fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.blueBorder,
+    fontSize: 15,
+    color: colors.darkBlue,
     textAlign: "center",
   },
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   Button3D component to mimic the 3D card layout from SessionScreen
+   ═══════════════════════════════════════════════════════════════ */
+
+function Button3D({ 
+  title, 
+  onPress, 
+  topColor, 
+  bottomColor, 
+  textColor, 
+  loading,
+}: {
+  title: string;
+  onPress: (e: any) => void;
+  topColor: string;
+  bottomColor: string;
+  textColor: string;
+  loading: boolean;
+}) {
+  const [pressed, setPressed] = useState(false);
+  const pressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(pressAnim, {
+      toValue: pressed ? 1 : 0,
+      duration: 150,
+      easing: Easing.inOut(Easing.sin),
+      useNativeDriver: false,
+    }).start();
+  }, [pressed]);
+
+  const webTransitionStyle = Platform.OS === "web" ? {
+    transition: "transform 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95), box-shadow 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95)",
+    boxShadow: pressed
+      ? `0px 0px 0px ${bottomColor}`
+      : `0px 8px 0px ${bottomColor}`,
+    transform: pressed ? "translateY(8px)" : "translateY(0px)",
+  } as any : undefined;
+
+  const nativeAnimStyle = Platform.OS !== "web" ? {
+    transform: [{ translateY: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) }],
+    shadowOffset: { width: 0, height: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) as unknown as number },
+    shadowOpacity: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+    elevation: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }),
+  } : undefined;
+
+  return (
+    <Pressable
+      onPress={(e) => {
+        if (!loading) onPress(e);
+      }}
+      onPressIn={() => !loading && setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={{ width: "100%", marginTop: 4, marginBottom: 4 }}
+    >
+      <Animated.View
+        style={[
+          {
+            backgroundColor: topColor,
+            borderWidth: 4,
+            borderColor: bottomColor,
+            borderRadius: 999,
+            paddingVertical: 16,
+            alignItems: "center",
+            shadowColor: bottomColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 1,
+            shadowRadius: 0,
+          },
+          Platform.OS === "web" 
+            ? { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, elevation: 0 } 
+            : undefined,
+          nativeAnimStyle,
+          webTransitionStyle,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={textColor} />
+        ) : (
+          <Text style={{ fontFamily: fonts.heading, fontSize: 20, color: textColor }}>
+            {title}
+          </Text>
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+}
+

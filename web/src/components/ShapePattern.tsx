@@ -7,6 +7,7 @@ const TILE = 65;
 const SIZE = TILE * 0.5;
 
 const WAVE_SPEED = 250;
+const DRIFT_SPEED = 30; // Baseline slow movement
 const WAVELENGTH = 190;
 const MAX_PUSH = 20;
 const DECAY_DIST = 520;
@@ -89,35 +90,28 @@ export default function ShapePattern({ volume = 0, burst = 0, cardCenter, swirl 
       smoothVolRef.current *= 0.94;
     }
 
-    phaseRef.current += dt * WAVE_SPEED;
+    // Always increment phase slightly for a slow drift
+    phaseRef.current += dt * (WAVE_SPEED * (smoothVolRef.current + 0.05));
     swirlPhaseRef.current += dt * SWIRL_SPEED;
 
     burstsRef.current = burstsRef.current
       .map((b) => ({ radius: b.radius + dt * BURST_SPEED, age: b.age + dt }))
       .filter((b) => b.age < BURST_LIFE);
 
-    const hasVolume = smoothVolRef.current > 0.003;
-    const hasBursts = burstsRef.current.length > 0;
-    const hasSwirl = swirlRef.current;
-
-    if (!hasVolume && !hasBursts && !hasSwirl) {
-      smoothVolRef.current = 0;
-      animatingRef.current = false;
-      forceRender((n) => n + 1);
-      return;
-    }
+    if (!animatingRef.current) return;
 
     forceRender((n) => n + 1);
     requestAnimationFrame(loop);
   }, []);
 
   useEffect(() => {
-    if ((volume > 0.01 || swirl) && !animatingRef.current) {
+    // Start animation loop immediately for baseline drift
+    if (!animatingRef.current) {
       animatingRef.current = true;
       lastFrameRef.current = performance.now();
       requestAnimationFrame(loop);
     }
-  }, [volume, swirl, loop]);
+  }, [loop]);
 
   useEffect(() => {
     return () => { animatingRef.current = false; };

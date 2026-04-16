@@ -11,6 +11,7 @@ import {
 import { colors, fonts } from "../theme";
 import { getSummary, imageUrl } from "../api";
 import { supabase } from "../lib/supabase";
+import ShapePattern from "../components/ShapePattern";
 
 interface Props {
   sessionId: string;
@@ -86,6 +87,7 @@ export default function SummaryScreen({
 
   return (
     <View style={styles.container}>
+      <ShapePattern />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

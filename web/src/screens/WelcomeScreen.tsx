@@ -40,7 +40,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
       )}
       <View style={styles.card}>
         <Image
-          source={require("../../assets/adio_logo2.png")}
+          source={require("../../assets/adiologo2.png")}
           style={styles.logo}
           resizeMode="contain"
         />

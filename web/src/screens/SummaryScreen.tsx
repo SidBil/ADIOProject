@@ -95,7 +95,7 @@ export default function SummaryScreen({
       >
         <View style={styles.card}>
           <Image
-            source={require("../../assets/adio_logo2.png")}
+            source={require("../../assets/adiologo2.png")}
             style={styles.logo}
             resizeMode="contain"
           />

@@ -629,6 +629,8 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden" as const,
     alignSelf: "stretch",
+    borderWidth: 5,
+    borderColor: "#002250",
   },
   imageLandscape: {
     width: "100%",
@@ -656,6 +658,8 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 10,
     borderRadius: 24,
     overflow: "hidden",
+    borderWidth: 5,
+    borderColor: "#002250",
   },
   sidebarWrapPortrait: {
     width: "100%",

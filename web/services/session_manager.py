@@ -33,6 +33,7 @@ class QuestionState:
     transcription: str | None = None
     evaluation: dict | None = None
     followup: str | None = None
+    initiation_latency_ms: float | None = None
 
 
 @dataclass
@@ -81,14 +82,76 @@ class Session:
                 "transcription": q.transcription,
                 "evaluation": q.evaluation,
                 "followup": q.followup,
+                "initiation_latency_ms": q.initiation_latency_ms,
             })
+
+        scores = self.compute_scores()
+
         return {
             "session_id": self.session_id,
             "image_id": self.image_id,
             "image_filename": self.image_filename,
             "progress": self.progress,
             "qa_history": qa_history,
+            "scores": scores,
         }
+
+    def compute_scores(self) -> dict:
+        """Compute Observation and Understanding from per-question evaluation data.
+
+        O = 0.5 * (1 - omission_rate) + 0.5 * relevance_normalized
+        U = 0.6 * relevance_normalized + 0.4 * accuracy_normalized
+
+        Engagement (E) requires cross-session baseline data and is computed
+        at the API layer, not here.
+        """
+        answered = [q for q in self.questions if q.evaluation is not None]
+        if not answered:
+            return {
+                "observation": None,
+                "understanding": None,
+                "engagement": None,
+                "avg_latency_ms": None,
+            }
+
+        o_values = []
+        u_values = []
+        latencies = []
+
+        for q in answered:
+            ev = q.evaluation or {}
+            scores = ev.get("scores", {})
+
+            # --- Observation ---
+            identified = ev.get("identified_elements", [])
+            missed = ev.get("missed_elements", [])
+            total_elements = len(identified) + len(missed)
+            omission_rate = len(missed) / max(total_elements, 1)
+            relevance_norm = scores.get("relevance", 3) / 5.0
+
+            o = 0.5 * (1.0 - omission_rate) + 0.5 * relevance_norm
+            o_values.append(o)
+
+            # --- Understanding ---
+            accuracy_norm = scores.get("accuracy", 3) / 5.0
+            u = 0.6 * relevance_norm + 0.4 * accuracy_norm
+            u_values.append(u)
+
+            # --- Latency ---
+            if q.initiation_latency_ms is not None:
+                latencies.append(q.initiation_latency_ms)
+
+        avg_o = sum(o_values) / len(o_values) if o_values else None
+        avg_u = sum(u_values) / len(u_values) if u_values else None
+        avg_latency = sum(latencies) / len(latencies) if latencies else None
+
+        return {
+            "observation": round(avg_o, 3) if avg_o is not None else None,
+            "understanding": round(avg_u, 3) if avg_u is not None else None,
+            "engagement": None,  # computed at API layer with baseline data
+            "avg_latency_ms": round(avg_latency, 1) if avg_latency is not None else None,
+        }
+
 
 
 def _load_metadata() -> dict[str, ImageMetadata]:
@@ -190,7 +253,8 @@ class SessionManager:
         return self.sessions.get(session_id)
 
     def record_answer(self, session_id: str, transcription: str,
-                      evaluation: dict, followup: dict | None = None):
+                      evaluation: dict, followup: dict | None = None,
+                      initiation_latency_ms: float | None = None):
         session = self.sessions[session_id]
         q = session.current_question
         if q is None:
@@ -198,6 +262,7 @@ class SessionManager:
         q.transcription = transcription
         q.evaluation = evaluation
         q.followup = followup.get("comment", "") if isinstance(followup, dict) else (followup or "")
+        q.initiation_latency_ms = initiation_latency_ms
         session.current_question_idx += 1
 
         if isinstance(followup, dict):

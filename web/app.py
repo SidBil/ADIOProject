@@ -12,8 +12,11 @@ Run: python app.py
 """
 
 import os
+import json as json_module
 import tempfile
 import traceback
+import urllib.request
+import urllib.error
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -63,6 +66,7 @@ class StartRequest(BaseModel):
 class EvaluateRequest(BaseModel):
     session_id: str
     transcription: str
+    initiation_latency_ms: float | None = None
 
 class TTSRequest(BaseModel):
     text: str
@@ -221,7 +225,13 @@ async def evaluate(req: EvaluateRequest):
         except Exception:
             traceback.print_exc()
 
-    sessions.record_answer(session.session_id, req.transcription, evaluation, followup)
+    sessions.record_answer(
+        session.session_id,
+        req.transcription,
+        evaluation,
+        followup,
+        initiation_latency_ms=req.initiation_latency_ms,
+    )
 
     comment = ""
     if followup and isinstance(followup, dict):
@@ -261,12 +271,102 @@ async def end_session(session_id: str):
 # Summary
 # ---------------------------------------------------------------------------
 
+ENGAGEMENT_BASELINE_N = 5
+ENGAGEMENT_MIN_SESSIONS = 3
+
+
+def _fetch_past_latencies(user_id: str) -> list[float]:
+    """Query Supabase for the user's past N sessions' avg_latency_ms."""
+    sb_url = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "").rstrip("/")
+    sb_key = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
+    if not sb_url or not sb_key:
+        return []
+
+    url = (
+        f"{sb_url}/rest/v1/sessions"
+        f"?user_id=eq.{user_id}"
+        f"&avg_latency_ms=not.is.null"
+        f"&select=avg_latency_ms"
+        f"&order=created_at.desc"
+        f"&limit={ENGAGEMENT_BASELINE_N}"
+    )
+    req = urllib.request.Request(url, headers={
+        "apikey": sb_key,
+        "Authorization": f"Bearer {sb_key}",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            rows = json_module.loads(resp.read().decode())
+            return [r["avg_latency_ms"] for r in rows if r.get("avg_latency_ms") is not None]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+
+def _count_past_sessions(user_id: str) -> int:
+    """Count how many past sessions exist for this user."""
+    sb_url = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "").rstrip("/")
+    sb_key = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
+    if not sb_url or not sb_key:
+        return 0
+
+    url = (
+        f"{sb_url}/rest/v1/sessions"
+        f"?user_id=eq.{user_id}"
+        f"&select=id"
+        f"&limit=100"
+    )
+    req = urllib.request.Request(url, headers={
+        "apikey": sb_key,
+        "Authorization": f"Bearer {sb_key}",
+        "Prefer": "count=exact",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            # The content-range header has the total count
+            cr = resp.headers.get("content-range", "")
+            if "/" in cr:
+                total = cr.split("/")[-1]
+                return int(total) if total != "*" else 0
+            rows = json_module.loads(resp.read().decode())
+            return len(rows)
+    except Exception:
+        traceback.print_exc()
+        return 0
+
+
 @app.get("/api/session/{session_id}/summary")
-async def session_summary(session_id: str):
+async def session_summary(session_id: str, user_id: str = ""):
     session = sessions.get_session(session_id)
     if not session:
         raise HTTPException(404, "Session not found")
-    return session.summary()
+
+    result = session.summary()
+    scores = result.get("scores", {})
+
+    # --- Compute Engagement from cross-session baseline ---
+    if user_id and scores.get("avg_latency_ms") is not None:
+        past_latencies = _fetch_past_latencies(user_id)
+        past_count = _count_past_sessions(user_id)
+
+        if len(past_latencies) >= ENGAGEMENT_MIN_SESSIONS:
+            baseline = sum(past_latencies) / len(past_latencies)
+            if baseline > 0:
+                e = max(0.0, min(1.0, 1.0 - scores["avg_latency_ms"] / baseline))
+                scores["engagement"] = round(e, 3)
+            else:
+                scores["engagement"] = 1.0
+        else:
+            scores["engagement"] = None
+
+        scores["sessions_toward_baseline"] = past_count
+        scores["baseline_min_sessions"] = ENGAGEMENT_MIN_SESSIONS
+    else:
+        scores["sessions_toward_baseline"] = 0
+        scores["baseline_min_sessions"] = ENGAGEMENT_MIN_SESSIONS
+
+    result["scores"] = scores
+    return result
 
 
 # ---------------------------------------------------------------------------

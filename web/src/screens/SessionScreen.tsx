@@ -76,6 +76,8 @@ export default function SessionScreen({
   const [burstCount, setBurstCount] = useState(0);
   const [micCenter, setMicCenter] = useState<{ x: number; y: number } | undefined>();
   const { volume, startMetering, stopMetering } = useVolumeMeter();
+  const questionShownAtRef = useRef<number>(Date.now());
+  const initiationLatencyMsRef = useRef<number | undefined>(undefined);
 
   const progress = session.progress;
   const currentNum = Math.min(progress.answered + 1, progress.total);
@@ -111,6 +113,8 @@ export default function SessionScreen({
 
       setIsRecording(true);
       setYellowPressed(true);
+      // Capture how long the user waited before speaking
+      initiationLatencyMsRef.current = Date.now() - questionShownAtRef.current;
     } catch (err: any) {
       showAlert("Recording error", err.message);
     }
@@ -144,7 +148,11 @@ export default function SessionScreen({
       const tData = await transcribeAudio(session.session_id, uri, mimeType);
       const transcription = tData.transcription || tData.text;
 
-      const eData = await evaluate(session.session_id, transcription);
+      const eData = await evaluate(
+        session.session_id,
+        transcription,
+        initiationLatencyMsRef.current,
+      );
 
       // Pre-calculate comment to wait for it before showing feedback card
       const comment = eData.followup || eData.evaluation?.feedback || "";
@@ -173,6 +181,9 @@ export default function SessionScreen({
 
   function handleNext() {
     setBurstCount((n) => n + 1);
+    // Reset the question timer for the next question
+    questionShownAtRef.current = Date.now();
+    initiationLatencyMsRef.current = undefined;
     if (session.progress.completed || !session.question) {
       onEnd();
     } else {

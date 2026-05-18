@@ -93,6 +93,7 @@ Return ONLY valid JSON in this exact format:
     "relevance": 0-5
   },
   "feedback": "your feedback here",
+  "identified_elements": ["list of key details the child correctly mentioned"],
   "missed_elements": ["list of key details they omitted"],
   "overall_score": 0-5
 }
@@ -108,7 +109,7 @@ Expected: "The umbrella is bright red."
 Entities: child; umbrella; rain
 Child said: "its red"
 Result:
-{"scores":{"accuracy":5,"detail":3,"clarity":4,"relevance":5},"feedback":"Great job! You noticed the red umbrella! Can you tell me more about it — is it big or small?","missed_elements":["bright"],"overall_score":4}
+{"scores":{"accuracy":5,"detail":3,"clarity":4,"relevance":5},"feedback":"Great job! You noticed the red umbrella! Can you tell me more about it — is it big or small?","identified_elements":["red","umbrella"],"missed_elements":["bright"],"overall_score":4}
 
 Example 2 (open-ended question — accept reasonable answers):
 Question: "If you were in this scene, what sounds might you hear?"
@@ -116,7 +117,7 @@ Expected: "quiet park sounds"
 Entities: robot; flower; bench
 Child said: "um maybe birds and like wind blowing"
 Result:
-{"scores":{"accuracy":5,"detail":4,"clarity":4,"relevance":5},"feedback":"I love that! Birds singing and wind blowing are great sounds you might hear in a park. What else might be quiet or peaceful there?","missed_elements":[],"overall_score":5}
+{"scores":{"accuracy":5,"detail":4,"clarity":4,"relevance":5},"feedback":"I love that! Birds singing and wind blowing are great sounds you might hear in a park. What else might be quiet or peaceful there?","identified_elements":["birds","wind blowing"],"missed_elements":[],"overall_score":5}
 
 Example 3 (open-ended question — different but valid interpretation):
 Question: "What mood or feeling does this picture give you?"
@@ -124,7 +125,7 @@ Expected: "sad or thoughtful"
 Entities: boy; rain; window
 Child said: "its cozy because hes inside and its raining"
 Result:
-{"scores":{"accuracy":4,"detail":4,"clarity":5,"relevance":5},"feedback":"What a thoughtful answer! Being inside while it rains can definitely feel cozy. What about the boy's face — does he look happy or more thoughtful?","missed_elements":[],"overall_score":5}
+{"scores":{"accuracy":4,"detail":4,"clarity":5,"relevance":5},"feedback":"What a thoughtful answer! Being inside while it rains can definitely feel cozy. What about the boy's face — does he look happy or more thoughtful?","identified_elements":["inside","raining","cozy feeling"],"missed_elements":[],"overall_score":5}
 
 Example 4 (child gives unrelated answer):
 Question: "What is the dog doing?"
@@ -132,7 +133,7 @@ Expected: "The brown dog is running through the grass."
 Entities: dog; ball; trees; grass
 Child said: "the dog is like running i think"
 Result:
-{"scores":{"accuracy":4,"detail":2,"clarity":3,"relevance":5},"feedback":"Yes, the dog is running! What color is the dog, and where is it running?","missed_elements":["brown","through the grass"],"overall_score":3}
+{"scores":{"accuracy":4,"detail":2,"clarity":3,"relevance":5},"feedback":"Yes, the dog is running! What color is the dog, and where is it running?","identified_elements":["dog","running"],"missed_elements":["brown","through the grass"],"overall_score":3}
 
 --- END EXAMPLES ---
 

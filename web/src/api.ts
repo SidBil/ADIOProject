@@ -39,11 +39,19 @@ export async function transcribeAudio(
   return res.json();
 }
 
-export async function evaluate(sessionId: string, transcription: string) {
+export async function evaluate(
+  sessionId: string,
+  transcription: string,
+  initiationLatencyMs?: number
+) {
   const res = await fetch(`${API_BASE}/api/evaluate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, transcription }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      transcription,
+      initiation_latency_ms: initiationLatencyMs ?? null,
+    }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -53,8 +61,10 @@ export async function endSession(sessionId: string) {
   await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: "POST" });
 }
 
-export async function getSummary(sessionId: string) {
-  const res = await fetch(`${API_BASE}/api/session/${sessionId}/summary`);
+export async function getSummary(sessionId: string, userId?: string) {
+  let url = `${API_BASE}/api/session/${sessionId}/summary`;
+  if (userId) url += `?user_id=${encodeURIComponent(userId)}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

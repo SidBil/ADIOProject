@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { colors, fonts } from "../theme";
 import ShapePattern from "../components/ShapePattern";
@@ -75,6 +76,18 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
 
         <Text style={styles.hint}>An image will be chosen for you.</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.feedbackBtn}
+        onPress={() =>
+          Linking.openURL(
+            "mailto:sidharthbildikar@gmail.com?subject=ADI%2FO%20Feedback%20%2F%20Bug%20Report"
+          )
+        }
+        activeOpacity={0.7}
+      >
+        <Text style={styles.feedbackText}>Send Feedback / Report a Bug</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -157,5 +170,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.textMuted,
+  },
+  feedbackBtn: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  feedbackText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.textMuted,
+    textDecorationLine: "underline",
   },
 });

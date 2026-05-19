@@ -7,12 +7,10 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Animated,
-  Easing,
   Platform,
   Pressable,
 } from "react-native";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Path, Circle, Line } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { getSummary, imageUrl } from "../api";
 import { supabase } from "../lib/supabase";
@@ -26,180 +24,91 @@ interface Props {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Score Ring — circular progress indicator
+   Gauge Meter — semicircular speedometer with needle
    ═══════════════════════════════════════════════════════════════ */
 
-function ScoreRing({
-  value,
-  size = 90,
-  strokeWidth = 8,
-  color,
-  bgColor = "#e0e0e8",
-}: {
-  value: number; // 0..1
-  size?: number;
-  strokeWidth?: number;
-  color: string;
-  bgColor?: string;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, Math.min(1, value));
-  const strokeDashoffset = circumference * (1 - progress);
+function GaugeMeter({ value, size = 140 }: { value: number; size?: number }) {
+  const cx = size / 2;
+  const cy = size * 0.65;
+  const r = size * 0.38;
+  const strokeW = size * 0.13;
+  const v = Math.max(0, Math.min(1, value));
+
+  const pt = (angle: number) => ({
+    x: cx + r * Math.cos(angle),
+    y: cy - r * Math.sin(angle),
+  });
+
+  const arcPath = (a1: number, a2: number) => {
+    const p1 = pt(a1);
+    const p2 = pt(a2);
+    const largeArc = Math.abs(a1 - a2) > Math.PI ? 1 : 0;
+    return `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y}`;
+  };
+
+  const segments = [
+    { from: Math.PI, to: (2 * Math.PI) / 3, color: "#F87171" },
+    { from: (2 * Math.PI) / 3, to: Math.PI / 3, color: "#FBBF24" },
+    { from: Math.PI / 3, to: 0.01, color: "#4ADE80" },
+  ];
+
+  const needleAngle = Math.PI * (1 - v);
+  const needleLen = r * 0.82;
+  const tip = {
+    x: cx + needleLen * Math.cos(needleAngle),
+    y: cy - needleLen * Math.sin(needleAngle),
+  };
 
   return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: "-90deg" }] }}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={bgColor}
-          strokeWidth={strokeWidth}
+    <Svg
+      width={size}
+      height={size * 0.55}
+      viewBox={`0 0 ${size} ${size * 0.7}`}
+    >
+      {segments.map((seg, i) => (
+        <Path
+          key={i}
+          d={arcPath(seg.from, seg.to)}
+          stroke={seg.color}
+          strokeWidth={strokeW}
           fill="none"
-        />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
         />
-      </Svg>
-      <Text
-        style={{
-          position: "absolute",
-          fontFamily: fonts.heading,
-          fontSize: 22,
-          color: colors.darkBlue,
-        }}
-      >
-        {Math.round(progress * 100)}%
-      </Text>
-    </View>
+      ))}
+      <Line
+        x1={cx}
+        y1={cy}
+        x2={tip.x}
+        y2={tip.y}
+        stroke={colors.darkBlue}
+        strokeWidth={3}
+        strokeLinecap="round"
+      />
+      <Circle cx={cx} cy={cy} r={5} fill={colors.darkBlue} />
+      <Circle cx={cx} cy={cy} r={2.5} fill="#fff" />
+    </Svg>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   3D Score Card
+   Star SVG
    ═══════════════════════════════════════════════════════════════ */
 
-function ScoreCard({
-  title,
-  value,
-  ringColor,
-  borderColor,
-  bgColor,
-  subtitle,
-  building,
-  buildingProgress,
-}: {
-  title: string;
-  value: number | null;
-  ringColor: string;
-  borderColor: string;
-  bgColor: string;
-  subtitle?: string;
-  building?: boolean;
-  buildingProgress?: string;
-}) {
+function StarIcon({ size = 50, color = "#FBBF24" }: { size?: number; color?: string }) {
   return (
-    <View
-      style={[
-        scoreStyles.card,
-        {
-          backgroundColor: bgColor,
-          borderColor: borderColor,
-        },
-        Platform.OS === "web"
-          ? ({
-              boxShadow: `0px 8px 0px ${borderColor}`,
-            } as any)
-          : {
-              shadowColor: borderColor,
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 1,
-              shadowRadius: 0,
-              elevation: 4,
-            },
-      ]}
-    >
-      <Text style={scoreStyles.cardTitle}>{title}</Text>
-      {building ? (
-        <View style={scoreStyles.buildingWrap}>
-          <Text style={scoreStyles.buildingText}>Building baseline…</Text>
-          {buildingProgress && (
-            <Text style={scoreStyles.buildingProgress}>{buildingProgress}</Text>
-          )}
-        </View>
-      ) : value != null ? (
-        <ScoreRing value={value} color={ringColor} />
-      ) : (
-        <Text style={scoreStyles.naText}>—</Text>
-      )}
-      {subtitle && !building && (
-        <Text style={scoreStyles.subtitle}>{subtitle}</Text>
-      )}
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+        fill={color}
+        stroke="#E5A300"
+        strokeWidth={0.5}
+      />
+    </Svg>
   );
 }
 
-const scoreStyles = StyleSheet.create({
-  card: {
-    borderWidth: 4,
-    borderRadius: 22,
-    padding: 18,
-    alignItems: "center",
-    flex: 1,
-    minWidth: 140,
-  },
-  cardTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 16,
-    color: colors.darkBlue,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  buildingWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    height: 90,
-  },
-  buildingText: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
-    color: colors.darkBlue,
-    textAlign: "center",
-  },
-  buildingProgress: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 4,
-    textAlign: "center",
-  },
-  naText: {
-    fontFamily: fonts.heading,
-    fontSize: 28,
-    color: colors.textMuted,
-    height: 90,
-    lineHeight: 90,
-  },
-  subtitle: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 8,
-    textAlign: "center",
-  },
-});
-
 /* ═══════════════════════════════════════════════════════════════
-   3D Button (consistent with LoginScreen)
+   3D Button
    ═══════════════════════════════════════════════════════════════ */
 
 function Button3D({
@@ -216,7 +125,6 @@ function Button3D({
   textColor: string;
 }) {
   const [pressed, setPressed] = useState(false);
-
   const webStyle =
     Platform.OS === "web"
       ? ({
@@ -234,7 +142,6 @@ function Button3D({
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
-      style={{ width: "100%", maxWidth: 360, marginTop: 20 }}
     >
       <View
         style={[
@@ -243,8 +150,11 @@ function Button3D({
             borderWidth: 4,
             borderColor: bottomColor,
             borderRadius: 999,
-            paddingVertical: 16,
+            paddingVertical: 14,
+            paddingHorizontal: 40,
             alignItems: "center",
+            flexDirection: "row",
+            gap: 8,
           },
           Platform.OS === "web"
             ? { shadowOpacity: 0, elevation: 0 }
@@ -258,15 +168,10 @@ function Button3D({
           webStyle,
         ]}
       >
-        <Text
-          style={{
-            fontFamily: fonts.heading,
-            fontSize: 20,
-            color: textColor,
-          }}
-        >
+        <Text style={{ fontFamily: fonts.heading, fontSize: 22, color: textColor }}>
           {title}
         </Text>
+        <Text style={{ fontSize: 20, color: textColor }}>›</Text>
       </View>
     </Pressable>
   );
@@ -302,9 +207,7 @@ export default function SummaryScreen({
             followup: item.followup,
             initiation_latency_ms: item.initiation_latency_ms,
           }));
-
           const scores = d.scores || {};
-
           supabase
             .from("sessions")
             .insert({
@@ -332,9 +235,7 @@ export default function SummaryScreen({
     return (
       <View style={styles.container}>
         <ShapePattern />
-        <Text style={styles.errorText}>
-          Could not load summary: {error}
-        </Text>
+        <Text style={styles.errorText}>Could not load summary: {error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={onNewSession}>
           <Text style={styles.retryBtnText}>Try Again</Text>
         </TouchableOpacity>
@@ -354,11 +255,37 @@ export default function SummaryScreen({
   const progress = data.progress || {};
   const history: any[] = data.qa_history || [];
   const scores = data.scores || {};
+  const answered = progress.answered || 0;
+  const total = progress.total || 0;
+
+  // Compute stars: count questions with overall_score >= 3
+  let starsEarned = 0;
+  for (const item of history) {
+    if (item.evaluation?.overall_score >= 3) starsEarned++;
+  }
 
   const engagementBuilding =
     scores.engagement === null || scores.engagement === undefined;
   const sessionsToward = scores.sessions_toward_baseline ?? 0;
   const baselineMin = scores.baseline_min_sessions ?? 3;
+
+  // Dynamic encouragement
+  const avgScore =
+    scores.observation != null && scores.understanding != null
+      ? (scores.observation + scores.understanding) / 2
+      : null;
+  const encourageTitle =
+    avgScore != null && avgScore >= 0.8
+      ? "Amazing work!"
+      : avgScore != null && avgScore >= 0.5
+      ? "Keep it up!"
+      : "Great effort!";
+  const encourageMsg =
+    avgScore != null && avgScore >= 0.8
+      ? "You're really getting the hang of describing what you see!"
+      : avgScore != null && avgScore >= 0.5
+      ? "The more you practice, the better you'll become at spotting details!"
+      : "Every session helps you get better. Keep practicing!";
 
   return (
     <View style={styles.container}>
@@ -368,62 +295,204 @@ export default function SummaryScreen({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <Image
-          source={require("../../assets/adiologo2.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Session Complete!</Text>
-        <Text style={styles.subtitle}>
-          You answered {progress.answered || 0} question
-          {(progress.answered || 0) !== 1 ? "s" : ""}. Great effort!
-        </Text>
-
-        {/* Score Cards */}
-        <View style={styles.scoreRow}>
-          <ScoreCard
-            title="Observation"
-            value={scores.observation}
-            ringColor={colors.pinkBorder}
-            borderColor={colors.pinkBorder}
-            bgColor={colors.pinkCard}
-            subtitle="Noticing details"
-          />
-          <ScoreCard
-            title="Understanding"
-            value={scores.understanding}
-            ringColor={colors.blueBorder}
-            borderColor={colors.blueBorder}
-            bgColor={colors.blueCard}
-            subtitle="Comprehension"
-          />
-          <ScoreCard
-            title="Engagement"
-            value={scores.engagement}
-            ringColor={colors.greenBorder}
-            borderColor={colors.greenBorder}
-            bgColor={colors.greenBtn}
-            building={engagementBuilding}
-            buildingProgress={
-              engagementBuilding
-                ? `${sessionsToward} / ${baselineMin} sessions`
-                : undefined
-            }
-            subtitle={!engagementBuilding ? "Response speed" : undefined}
-          />
+        {/* ── Great Job Card ── */}
+        <View
+          style={[
+            styles.card3d,
+            {
+              backgroundColor: colors.greenBtn,
+              borderColor: colors.greenBorder,
+            },
+            Platform.OS === "web"
+              ? ({ boxShadow: `0px 8px 0px ${colors.greenBorder}` } as any)
+              : {
+                  shadowColor: colors.greenBorder,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                },
+          ]}
+        >
+          <View style={styles.greatJobRow}>
+            <StarIcon size={44} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.greatJobTitle}>Great job!</Text>
+              <Text style={styles.greatJobSub}>
+                You explored the scene and answered {answered} question
+                {answered !== 1 ? "s" : ""}.
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Session Image */}
-        {data.image_filename && (
-          <Image
-            source={{ uri: imageUrl(`/images/${data.image_filename}`) }}
-            style={styles.summaryImage}
-            resizeMode="cover"
-          />
-        )}
+        {/* ── Score Cards Row ── */}
+        <View style={styles.scoreRow}>
+          {/* Understanding */}
+          <View
+            style={[
+              styles.gaugeCard,
+              {
+                backgroundColor: colors.greenBtn,
+                borderColor: colors.greenBorder,
+              },
+              Platform.OS === "web"
+                ? ({ boxShadow: `0px 6px 0px ${colors.greenBorder}` } as any)
+                : {
+                    shadowColor: colors.greenBorder,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                  },
+            ]}
+          >
+            <Text style={styles.gaugeTitle}>Understanding</Text>
+            {scores.understanding != null ? (
+              <>
+                <GaugeMeter value={scores.understanding} />
+                <Text style={styles.gaugePct}>
+                  {Math.round(scores.understanding * 100)}%
+                </Text>
+                <Text style={styles.gaugeDesc}>
+                  You understood most of what you saw!
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.gaugeNa}>—</Text>
+            )}
+          </View>
 
-        {/* Q&A History */}
+          {/* Observation */}
+          <View
+            style={[
+              styles.gaugeCard,
+              {
+                backgroundColor: colors.pinkCard,
+                borderColor: colors.pinkBorder,
+              },
+              Platform.OS === "web"
+                ? ({ boxShadow: `0px 6px 0px ${colors.pinkBorder}` } as any)
+                : {
+                    shadowColor: colors.pinkBorder,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                  },
+            ]}
+          >
+            <Text style={styles.gaugeTitle}>Observation</Text>
+            {scores.observation != null ? (
+              <>
+                <GaugeMeter value={scores.observation} />
+                <Text style={styles.gaugePct}>
+                  {Math.round(scores.observation * 100)}%
+                </Text>
+                <Text style={styles.gaugeDesc}>
+                  You noticed lots of great details!
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.gaugeNa}>—</Text>
+            )}
+          </View>
+
+          {/* Engagement */}
+          <View
+            style={[
+              styles.gaugeCard,
+              {
+                backgroundColor: colors.blueCard,
+                borderColor: colors.blueBorder,
+              },
+              Platform.OS === "web"
+                ? ({ boxShadow: `0px 6px 0px ${colors.blueBorder}` } as any)
+                : {
+                    shadowColor: colors.blueBorder,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                  },
+            ]}
+          >
+            <Text style={styles.gaugeTitle}>Engagement</Text>
+            {engagementBuilding ? (
+              <View style={styles.buildingWrap}>
+                <Text style={styles.buildingText}>Building baseline…</Text>
+                <Text style={styles.buildingProg}>
+                  {sessionsToward} / {baselineMin} sessions
+                </Text>
+              </View>
+            ) : scores.engagement != null ? (
+              <>
+                <GaugeMeter value={scores.engagement} />
+                <Text style={styles.gaugePct}>
+                  {Math.round(scores.engagement * 100)}%
+                </Text>
+                <Text style={styles.gaugeDesc}>
+                  You stayed focused and did an awesome job!
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.gaugeNa}>—</Text>
+            )}
+          </View>
+
+          {/* Stars Earned */}
+          <View
+            style={[
+              styles.gaugeCard,
+              {
+                backgroundColor: colors.yellowCard,
+                borderColor: colors.yellowBorder,
+              },
+              Platform.OS === "web"
+                ? ({ boxShadow: `0px 6px 0px ${colors.yellowBorder}` } as any)
+                : {
+                    shadowColor: colors.yellowBorder,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                  },
+            ]}
+          >
+            <Text style={styles.gaugeTitle}>You earned</Text>
+            <View style={styles.starWrap}>
+              <StarIcon size={64} />
+            </View>
+            <Text style={styles.gaugePct}>
+              {starsEarned} / {total}
+            </Text>
+            <Text style={styles.gaugeDesc}>stars</Text>
+          </View>
+        </View>
+
+        {/* ── Encouragement Card ── */}
+        <View
+          style={[
+            styles.card3d,
+            {
+              backgroundColor: "#F3EEFF",
+              borderColor: "#B89AFF",
+            },
+            Platform.OS === "web"
+              ? ({ boxShadow: `0px 6px 0px #B89AFF` } as any)
+              : {
+                  shadowColor: "#B89AFF",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 1,
+                  shadowRadius: 0,
+                },
+          ]}
+        >
+          <View style={styles.greatJobRow}>
+            <Text style={{ fontSize: 28 }}>💡</Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.encourageTitle}>{encourageTitle}</Text>
+              <Text style={styles.encourageMsg}>{encourageMsg}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Q&A History ── */}
         <Text style={styles.historyTitle}>Question History</Text>
         {history.map((item: any, idx: number) => {
           const fb = item.followup || item.evaluation?.feedback || "";
@@ -451,19 +520,19 @@ export default function SummaryScreen({
           );
         })}
 
-        {/* New Session Button */}
-        <Button3D
-          title="Start a New Session"
-          onPress={() => {
-            setBurstCount((n) => n + 1);
-            onNewSession();
-          }}
-          topColor={colors.greenBtn}
-          bottomColor={colors.greenBorder}
-          textColor={colors.darkBlue}
-        />
-
-        <View style={{ height: 40 }} />
+        {/* ── Continue Button ── */}
+        <View style={{ marginTop: 16, marginBottom: 40, alignItems: "center" }}>
+          <Button3D
+            title="Continue"
+            onPress={() => {
+              setBurstCount((n) => n + 1);
+              onNewSession();
+            }}
+            topColor={colors.yellowCard}
+            bottomColor={colors.yellowBorder}
+            textColor={colors.darkBlue}
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -483,50 +552,129 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, width: "100%" },
   scrollContent: {
     alignItems: "center",
-    paddingVertical: 30,
-    paddingHorizontal: 8,
+    paddingVertical: 24,
+    paddingHorizontal: 4,
+    maxWidth: 700,
+    alignSelf: "center",
+    width: "100%",
   },
-  logo: {
-    height: 100,
-    width: 200,
-    marginTop: -15,
-    marginBottom: -10,
+
+  /* 3D Cards */
+  card3d: {
+    borderWidth: 4,
+    borderRadius: 22,
+    padding: 18,
+    width: "100%",
+    marginBottom: 16,
   },
-  title: {
+
+  /* Great Job */
+  greatJobRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  greatJobTitle: {
     fontFamily: fonts.heading,
-    fontSize: 36,
+    fontSize: 26,
+    color: colors.darkBlue,
+  },
+  greatJobSub: {
+    fontFamily: fonts.body,
+    fontSize: 15,
     color: colors.darkBlueText,
+    marginTop: 2,
+  },
+
+  /* Score Cards */
+  scoreRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    width: "100%",
+    marginBottom: 16,
+    justifyContent: "center",
+  },
+  gaugeCard: {
+    borderWidth: 4,
+    borderRadius: 20,
+    padding: 14,
+    alignItems: "center",
+    minWidth: 145,
+    flex: 1,
+    maxWidth: 180,
+  },
+  gaugeTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 15,
+    color: colors.darkBlue,
     marginBottom: 6,
     textAlign: "center",
   },
-  subtitle: {
+  gaugePct: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: colors.darkBlue,
+    marginTop: 2,
+  },
+  gaugeDesc: {
     fontFamily: fonts.body,
-    fontSize: 16,
+    fontSize: 12,
+    color: colors.darkBlueText,
+    textAlign: "center",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  gaugeNa: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
     color: colors.textMuted,
-    marginBottom: 24,
+    height: 90,
+    lineHeight: 90,
+  },
+  starWrap: {
+    height: 72,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buildingWrap: {
+    height: 90,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buildingText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.darkBlue,
     textAlign: "center",
   },
-  scoreRow: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-    maxWidth: 520,
-    marginBottom: 24,
+  buildingProg: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 4,
   },
-  summaryImage: {
-    width: "100%",
-    maxWidth: 400,
-    height: 220,
-    borderRadius: 20,
-    marginBottom: 24,
+
+  /* Encouragement */
+  encourageTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 18,
+    color: colors.darkBlue,
   },
+  encourageMsg: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.darkBlueText,
+    marginTop: 2,
+    lineHeight: 20,
+  },
+
+  /* History */
   historyTitle: {
     fontFamily: fonts.heading,
     fontSize: 22,
     color: colors.darkBlue,
     marginBottom: 12,
     alignSelf: "flex-start",
-    maxWidth: 520,
     width: "100%",
   },
   historyItem: {
@@ -537,7 +685,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
     width: "100%",
-    maxWidth: 520,
   },
   hHeader: {
     flexDirection: "row",

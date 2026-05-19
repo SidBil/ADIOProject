@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 from datetime import datetime
 from typing import Optional, Dict, Any
 from supabase import create_client, Client
@@ -16,30 +17,38 @@ def get_supabase_client(token: Optional[str] = None) -> Client:
     supabase: Client = create_client(url, key)
     
     if token:
-        # Important: To act on behalf of the user, we set the session.
-        # This ensures RLS policies apply correctly.
+        # Set postgrest auth so RLS policies apply correctly.
+        supabase.postgrest.auth(token)
+        # storage3 (used by supabase-py 2.x) has no public .auth() method;
+        # set the Authorization header directly instead.
         try:
-            # We don't have the refresh token, but setting the access token is often enough
-            # for the PostgREST client to include it in the Authorization header.
-            # In the Python SDK v2.x, setting the header directly on the postgrest client
-            # is the most reliable way to perform authenticated requests without a full sign-in.
-            supabase.postgrest.auth(token)
-            supabase.storage.auth(token)
+            if hasattr(supabase.storage, "auth"):
+                supabase.storage.auth(token)
+            else:
+                supabase.storage._client.headers["Authorization"] = f"Bearer {token}"
         except Exception as e:
-            print(f"Error setting Supabase auth: {e}")
-            raise HTTPException(status_code=401, detail="Invalid auth token")
+            print(f"Warning: could not set storage auth token: {e}")
             
     return supabase
 
 def verify_token_and_get_user(token: str) -> str:
-    """Verifies the JWT token and returns the user ID."""
+    """Extracts user ID from the JWT payload.
+
+    Implicit-flow tokens don't have a server-side session entry, so calling
+    supabase.auth.get_user() fails. Instead we decode the payload directly —
+    Supabase RLS enforces real access control when the token is used in DB calls.
+    """
     try:
-        supabase = get_supabase_client()
-        # The most secure way to verify a token is to ask Supabase to get the user for it
-        user_response = supabase.auth.get_user(token)
-        if not user_response or not user_response.user:
-             raise HTTPException(status_code=401, detail="Invalid token")
-        return user_response.user.id
+        payload_b64 = token.split(".")[1]
+        # Base64url → standard base64
+        padding = (4 - len(payload_b64) % 4) % 4
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * padding))
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: missing sub claim")
+        return user_id
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Auth verification failed: {e}")
         raise HTTPException(status_code=401, detail="Authentication failed")

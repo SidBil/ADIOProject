@@ -74,7 +74,8 @@ class ASRService:
         self._clip_model = CLIPModel.from_pretrained(DEFAULT_CLIP_MODEL).to(device)
         self._clip_model.eval()
 
-        self._image_embeddings: dict[str, np.ndarray] = {}
+        from typing import Any
+        self._image_embeddings: dict[str, Any] = {}
         if DEFAULT_CACHE_PATH.exists():
             data = np.load(str(DEFAULT_CACHE_PATH))
             self._image_embeddings = dict(data)

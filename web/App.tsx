@@ -18,11 +18,13 @@ import WelcomeScreen from "./src/screens/WelcomeScreen";
 import SessionScreen from "./src/screens/SessionScreen";
 import SummaryScreen from "./src/screens/SummaryScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
+import OnboardingScreen from "./src/screens/OnboardingScreen";
 import { startSession as apiStartSession } from "./src/api";
 import { supabase } from "./src/lib/supabase";
+import { track } from "./src/lib/analytics";
 import { colors } from "./src/theme";
 
-type Screen = "welcome" | "session" | "summary" | "dashboard";
+type Screen = "welcome" | "session" | "summary" | "dashboard" | "onboarding";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -38,26 +40,55 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("welcome");
   const [session, setSession] = useState<any>(null);
 
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+
   useEffect(() => {
+    const checkProfile = async (u: User) => {
+      try {
+        const { data } = await supabase.from("user_profiles").select("id").eq("id", u.id).maybeSingle();
+        if (data) {
+          setHasProfile(true);
+          setScreen("welcome");
+        } else {
+          setHasProfile(false);
+          setScreen("onboarding");
+        }
+      } catch (e) {
+        console.error("Profile check failed", e);
+      } finally {
+        setAuthReady(true);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s: Session | null) => {
-        setUser(s?.user ?? null);
-        setAuthReady(true);
+        const u = s?.user ?? null;
+        setUser(u);
+        if (u) checkProfile(u);
+        else setAuthReady(true);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setUser(s?.user ?? null);
-      setAuthReady(true);
+      const u = s?.user ?? null;
+      setUser(u);
+      if (u) checkProfile(u);
+      else setAuthReady(true);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleStart = useCallback(async () => {
-    const data = await apiStartSession();
-    setSession(data);
-    setScreen("session");
+    try {
+      const data = await apiStartSession();
+      setSession(data);
+      setScreen("session");
+      track("session_started", { total_questions: data.total_questions });
+    } catch (error: any) {
+      track("app_error", { area: "session_start", error_message: error.message });
+      throw error;
+    }
   }, []);
 
   const handleEnd = useCallback(() => {
@@ -102,6 +133,15 @@ export default function App() {
   return (
     <>
       <StatusBar style="dark" />
+      {screen === "onboarding" && user && (
+        <OnboardingScreen 
+          userId={user.id} 
+          onComplete={() => {
+             setHasProfile(true);
+             setScreen("welcome");
+          }} 
+        />
+      )}
       {screen === "welcome" && (
         <WelcomeScreen
           onStart={handleStart}

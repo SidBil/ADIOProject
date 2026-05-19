@@ -81,7 +81,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
         style={styles.feedbackBtn}
         onPress={() =>
           Linking.openURL(
-            "mailto:sidharthbildikar@gmail.com?subject=ADI%2FO%20Feedback%20%2F%20Bug%20Report"
+            "mailto:sidharthbildikar@gmail.com?subject=Adio%20Feedback%20%2F%20Bug%20Report"
           )
         }
         activeOpacity={0.7}

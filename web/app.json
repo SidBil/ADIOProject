@@ -31,7 +31,7 @@
       [
         "expo-av",
         {
-          "microphonePermission": "ADI/O needs your microphone to listen to your answers."
+          "microphonePermission": "Adio needs your microphone to listen to your answers."
         }
       ]
     ]

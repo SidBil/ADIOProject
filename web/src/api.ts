@@ -1,10 +1,21 @@
 import { Platform } from "react-native";
 import { API_BASE } from "./config";
+import { supabase } from "./lib/supabase";
+
+async function getAuthHeaders(extraHeaders: Record<string, string> = {}) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return {
+    ...extraHeaders,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export async function startSession() {
+  const headers = await getAuthHeaders({ "Content-Type": "application/json" });
   const res = await fetch(`${API_BASE}/api/session/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -31,9 +42,11 @@ export async function transcribeAudio(
     } as any);
   }
 
+  const headers = await getAuthHeaders();
+  
   const res = await fetch(
     `${API_BASE}/api/transcribe?session_id=${sessionId}`,
-    { method: "POST", body: form }
+    { method: "POST", headers, body: form }
   );
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -44,9 +57,10 @@ export async function evaluate(
   transcription: string,
   initiationLatencyMs?: number
 ) {
+  const headers = await getAuthHeaders({ "Content-Type": "application/json" });
   const res = await fetch(`${API_BASE}/api/evaluate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       session_id: sessionId,
       transcription,
@@ -58,13 +72,16 @@ export async function evaluate(
 }
 
 export async function endSession(sessionId: string) {
-  await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: "POST" });
+  const headers = await getAuthHeaders();
+  await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: "POST", headers });
 }
 
 export async function getSummary(sessionId: string, userId?: string) {
   let url = `${API_BASE}/api/session/${sessionId}/summary`;
-  if (userId) url += `?user_id=${encodeURIComponent(userId)}`;
-  const res = await fetch(url);
+  const headers = await getAuthHeaders();
+  // We don't need to pass userId in the query anymore, but leaving it doesn't hurt.
+  // The backend extracts user_id from the JWT token now.
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

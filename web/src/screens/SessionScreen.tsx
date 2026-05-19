@@ -15,6 +15,7 @@ import {
 import { Audio } from "expo-av";
 import { colors, fonts } from "../theme";
 import { imageUrl, transcribeAudio, evaluate, endSession, speakTTS } from "../api";
+import { track } from "../lib/analytics";
 import Stars from "../components/Stars";
 import ShapePattern from "../components/ShapePattern";
 import useVolumeMeter from "../hooks/useVolumeMeter";
@@ -85,6 +86,16 @@ export default function SessionScreen({
     ? Math.round((progress.answered / progress.total) * 100)
     : 0;
 
+  useEffect(() => {
+    if (session.question) {
+      track("question_viewed", {
+        question_index: progress.answered,
+        structure_word: session.question.structure_word,
+        difficulty: session.question.difficulty,
+      });
+    }
+  }, [session.question?.id]);
+
   async function startRecording() {
     try {
       const { granted } = await Audio.requestPermissionsAsync();
@@ -115,13 +126,23 @@ export default function SessionScreen({
       setYellowPressed(true);
       // Capture how long the user waited before speaking
       initiationLatencyMsRef.current = Date.now() - questionShownAtRef.current;
+      
+      track("recording_started", {
+        question_index: progress.answered,
+        structure_word: session.question?.structure_word,
+      });
     } catch (err: any) {
+      track("app_error", { area: "recording_start", error_message: err.message });
       showAlert("Recording error", err.message);
     }
   }
 
   async function stopRecording() {
     if (!recordingRef.current) return;
+    
+    // Calculate how long they were speaking
+    const recordingDurationMs = recordingRef.current._finalDurationMillis || 0; // rough duration
+    
     setIsRecording(false);
     setYellowPressed(false);
     stopMetering();
@@ -136,6 +157,8 @@ export default function SessionScreen({
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       if (!uri) return;
+
+      track("recording_stopped", { duration_ms: recordingDurationMs });
 
       setIsProcessing(true);
 
@@ -153,6 +176,10 @@ export default function SessionScreen({
         transcription,
         initiationLatencyMsRef.current,
       );
+      track("evaluation_completed", { 
+        latency_ms: eData.evaluation?.llm_latency_ms || 0,
+        followup_created: !!eData.followup 
+      });
 
       // Pre-calculate comment to wait for it before showing feedback card
       const comment = eData.followup || eData.evaluation?.feedback || "";
@@ -168,6 +195,7 @@ export default function SessionScreen({
       });
       setCardState("feedback");
     } catch (err: any) {
+      track("app_error", { area: "processing", error_message: err.message });
       showAlert("Error", err.message);
     } finally {
       setIsProcessing(false);
@@ -185,6 +213,10 @@ export default function SessionScreen({
     questionShownAtRef.current = Date.now();
     initiationLatencyMsRef.current = undefined;
     if (session.progress.completed || !session.question) {
+      track("session_completed", { 
+        questions_answered: session.progress.answered,
+        total_questions: session.progress.total
+      });
       onEnd();
     } else {
       setCardState("question");
@@ -193,6 +225,10 @@ export default function SessionScreen({
 
   async function handleClose() {
     try {
+      track("session_abandoned", {
+        questions_answered: session.progress.answered,
+        total_questions: session.progress.total
+      });
       await endSession(session.session_id);
     } catch {}
     onEnd();

@@ -34,6 +34,7 @@ class QuestionState:
     evaluation: dict | None = None
     followup: str | None = None
     initiation_latency_ms: float | None = None
+    internal_db_id: str | None = None
 
 
 @dataclass
@@ -56,6 +57,7 @@ class Session:
     questions: list[QuestionState] = field(default_factory=list)
     current_question_idx: int = 0
     completed: bool = False
+    internal_db_id: str | None = None
 
     @property
     def current_question(self) -> QuestionState | None:

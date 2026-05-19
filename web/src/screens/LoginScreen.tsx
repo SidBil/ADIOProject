@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
+import { track } from "../lib/analytics";
 import ShapePattern from "../components/ShapePattern";
 
 interface Props {
@@ -43,6 +44,8 @@ export default function LoginScreen({ onAuth }: Props) {
     setLoading(true);
     setError(null);
 
+    track("auth_started", { method: "email", is_signup: isSignUp });
+
     const { error: authError } = isSignUp
       ? await supabase.auth.signUp({ email: email.trim(), password })
       : await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -51,11 +54,15 @@ export default function LoginScreen({ onAuth }: Props) {
 
     if (authError) {
       setError(authError.message);
-    } else if (isSignUp) {
+      track("app_error", { area: "auth", error_code: authError.code });
+    } else {
+      track("auth_completed", { method: "email", success: true });
+      if (isSignUp) {
       setError(null);
       setIsSignUp(false);
       if (Platform.OS === "web") window.alert("Check your email to confirm your account.");
       else setError("Check your email to confirm your account.");
+      }
     }
   }
 
@@ -66,6 +73,7 @@ export default function LoginScreen({ onAuth }: Props) {
     }
     setLoading(true);
     setError(null);
+    track("auth_started", { method: "google" });
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -73,7 +81,12 @@ export default function LoginScreen({ onAuth }: Props) {
       },
     });
     setLoading(false);
-    if (oauthError) setError(oauthError.message);
+    if (oauthError) {
+      setError(oauthError.message);
+      track("app_error", { area: "auth", error_code: oauthError.code });
+    } else {
+      track("auth_completed", { method: "google", success: true });
+    }
   }
 
   function handleSwitch(e: any) {

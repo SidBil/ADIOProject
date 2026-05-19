@@ -8,9 +8,7 @@ In development (no URL set), falls back to loading models locally.
 import os
 import io
 import re
-import numpy as np
 import requests
-import soundfile as sf
 from pathlib import Path
 
 WEB_ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +37,7 @@ class ASRService:
         self._loaded = True
 
     def _load_local(self):
+        import numpy as np
         import torch
         from transformers import (
             WhisperProcessor, WhisperForConditionalGeneration,
@@ -120,6 +119,7 @@ class ASRService:
     def _transcribe_local(self, audio_path: str | Path, image_id: str | None,
                           alpha: float, num_beams: int) -> dict:
         import torch
+        import soundfile as sf
 
         audio_array, sr = sf.read(str(audio_path))
 
@@ -170,6 +170,7 @@ class ASRService:
 
     def _rescore(self, hypotheses, img_emb, alpha):
         import torch
+        import numpy as np
 
         def normalize(text):
             text = text.strip().lower()

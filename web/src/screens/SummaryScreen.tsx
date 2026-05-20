@@ -193,6 +193,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
     transform: contPressed ? "translateY(6px)" : "translateY(0px)",
   } as any) : undefined;
 
+  const isMobile = winW < 600;
+
   // Generous responsive scaling — heavily biased toward LARGE text
   const pad           = Math.max(14, winW * 0.018);
   const titleBarH     = Math.max(36, winH * 0.05);
@@ -203,23 +205,34 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
   const bannerTitleSz = Math.max(38, Math.min(64, winH * 0.08));
   const bannerSubSz   = Math.max(20, Math.min(30, winH * 0.038));
 
-  const gaugeLabelSz  = Math.max(36, Math.min(56, winH * 0.07));
-  const gaugePctSz    = Math.max(40, Math.min(72, winH * 0.09));
-  const gaugeDescSz   = Math.max(15, Math.min(22, winH * 0.026));
-
-  const starIconSz    = Math.max(80, Math.min(140, winH * 0.18));
-  const earnedSz      = Math.max(36, Math.min(56, winH * 0.07));
-  const starCountSz   = Math.max(34, Math.min(54, winH * 0.066));
-  const starWordSz    = Math.max(20, Math.min(30, winH * 0.036));
-  const contFontSz    = Math.max(24, Math.min(36, winH * 0.045));
-
+  // Card width drives gauge font sizes so text never overflows the card
   const cardGap       = Math.max(10, winW * 0.012);
+  const cardW         = isMobile
+    ? winW - pad * 2
+    : (winW - pad * 2 - cardGap * 3) / 4;
+
+  const gaugeLabelSz  = Math.min(Math.max(14, winH * 0.055), cardW * 0.18);
+  const gaugePctSz    = Math.min(Math.max(18, winH * 0.07), cardW * 0.22);
+  const gaugeDescSz   = Math.min(Math.max(11, winH * 0.022), cardW * 0.072);
+
+  const starIconSz    = Math.max(60, Math.min(110, winH * 0.14));
+  const earnedSz      = Math.min(Math.max(14, winH * 0.055), cardW * 0.18);
+  const starCountSz   = Math.min(Math.max(18, winH * 0.055), cardW * 0.21);
+  const starWordSz    = Math.min(Math.max(12, winH * 0.03), cardW * 0.10);
+  const contFontSz    = Math.min(Math.max(14, winH * 0.038), cardW * 0.13);
+
   const cardBorder    = Math.max(4, Math.min(6, winH * 0.007));
   const cardRadius    = Math.max(20, winH * 0.03);
 
   return (
-    <View style={[s.root, { width: winW, height: winH }]}>
+    <View style={[s.root, { width: winW, minHeight: winH }]}>
       <ShapePattern />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: pad * 2 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* ════════  TOP BAR: logo + plain title text ════════ */}
       <View style={[s.topBar, { paddingHorizontal: pad, paddingTop: pad, paddingBottom: pad * 0.3 }]}>
@@ -238,8 +251,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
           </Text>
         </View>
 
-        {/* ── Scores row: 3 colored gauges + pink stars card (all flex: 1) ── */}
-        <View style={[s.scoresRow, { gap: cardGap }]}>
+        {/* ── Scores row: 3 colored gauges + pink stars card ── */}
+        <View style={[s.scoresRow, { gap: cardGap, flexDirection: isMobile ? "column" : "row" }]}>
 
           {/* Understanding — YELLOW */}
           <GaugeCard
@@ -257,6 +270,7 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             pctSz={gaugePctSz}
             descSz={gaugeDescSz}
             pad={pad}
+            isMobile={isMobile}
           />
 
           {/* Observation — GREEN */}
@@ -275,6 +289,7 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             pctSz={gaugePctSz}
             descSz={gaugeDescSz}
             pad={pad}
+            isMobile={isMobile}
           />
 
           {/* Engagement — BLUE */}
@@ -293,6 +308,7 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             pctSz={gaugePctSz}
             descSz={gaugeDescSz}
             pad={pad}
+            isMobile={isMobile}
           />
 
           {/* Stars + Continue — PINK */}
@@ -302,6 +318,7 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             borderWidth: cardBorder,
             borderRadius: cardRadius,
             paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
+            aspectRatio: isMobile ? undefined : 1,
           },
             Platform.OS === "web"
               ? ({ boxShadow: `0px ${cardBorder}px 0px ${colors.pinkBorder}` } as any)
@@ -338,12 +355,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
         </View>
       </View>
 
-      {/* ════════  QUESTION HISTORY — scrollable, always below summary ════════ */}
-      <ScrollView
-        style={[s.histScroll, { paddingHorizontal: pad, marginTop: pad }]}
-        contentContainerStyle={{ paddingBottom: pad * 2 }}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* ════════  QUESTION HISTORY ════════ */}
+      <View style={{ paddingHorizontal: pad, marginTop: pad }}>
         <Text style={[s.histTitle, { fontSize: bannerTitleSz * 0.7, marginBottom: pad }]}>Question History</Text>
         {history.map((item: any, idx: number) => {
           const fb = item.followup || item.evaluation?.feedback || "";
@@ -364,6 +377,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             </View>
           );
         })}
+      </View>
+
       </ScrollView>
     </View>
   );
@@ -386,15 +401,17 @@ function GaugeCard(props: {
   pctSz: number;
   descSz: number;
   pad: number;
+  isMobile?: boolean;
 }) {
   const { label, bg, border, scores, scoreKey, engBuilding, sessToward, baseMin,
-          cardBorder, cardRadius, labelSz, pctSz, descSz, pad } = props;
+          cardBorder, cardRadius, labelSz, pctSz, descSz, pad, isMobile } = props;
   const value = scores[scoreKey] as number | null | undefined;
 
   return (
     <View style={[s.gaugeCard, {
       backgroundColor: bg, borderColor: border, borderWidth: cardBorder, borderRadius: cardRadius,
       paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
+      aspectRatio: isMobile ? undefined : 1,
     },
       Platform.OS === "web"
         ? ({ boxShadow: `0px ${cardBorder}px 0px ${border}` } as any)
@@ -429,7 +446,7 @@ function GaugeCard(props: {
    ═══════════════════════════════════════════════════════════════ */
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
 
   /* ── Top bar ── */
@@ -457,7 +474,6 @@ const s = StyleSheet.create({
   },
   gaugeCard: {
     flex: 1,
-    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "flex-start",
   },
@@ -472,7 +488,6 @@ const s = StyleSheet.create({
   /* ── Stars card (pink) ── */
   starsCard: {
     flex: 1,
-    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "flex-start",
   },

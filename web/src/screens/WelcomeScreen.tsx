@@ -42,10 +42,10 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
   const cardBorder    = Math.max(4, Math.min(6, winH * 0.007));
   const cardRadius    = Math.max(20, winH * 0.03);
 
-  const logoH         = Math.max(80, Math.min(140, winH * 0.16));
+  const logoH         = Math.max(120, Math.min(210, winH * 0.24));
   const logoW         = logoH * 2.4;
 
-  const titleSz       = Math.max(28, Math.min(46, winH * 0.058));
+
   const descSz        = Math.max(16, Math.min(22, winH * 0.026));
   const btnFontSz     = Math.max(20, Math.min(30, winH * 0.036));
   const hintSz        = Math.max(13, Math.min(16, winH * 0.02));
@@ -63,7 +63,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
   } as any) : undefined;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width: winW, height: winH }]}>
       <ShapePattern />
 
       {onSignOut && (
@@ -74,14 +74,10 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
 
       <View style={[styles.contentWrap, { padding: pad }]}>
         <Image
-          source={require("../../assets/adiologo.png")}
-          style={{ width: logoW, height: logoH, marginBottom: pad * 1.2 }}
+          source={require("../../assets/adiologowithtext-03.png")}
+          style={{ width: logoW, height: logoH, marginBottom: pad * 1.5 }}
           resizeMode="contain"
         />
-
-        <Text style={[styles.title, { fontSize: titleSz, marginBottom: pad }]}>
-          Reading Comprehension Therapy
-        </Text>
 
         <Text style={[styles.description, {
           fontSize: descSz,
@@ -90,7 +86,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
           maxWidth: 640,
         }]}>
           You will be shown a picture and asked to describe what you see. Speak
-          your answers out loud — a friendly guide will listen and help you
+          your answers out loud. A friendly guide will listen and help you
           notice more details.
         </Text>
 
@@ -107,7 +103,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
               styles.beginBtn,
               {
                 borderWidth: cardBorder,
-                borderRadius: cardRadius * 0.7,
+                borderRadius: 999,
                 paddingVertical: pad,
                 paddingHorizontal: pad * 3,
               },
@@ -144,7 +140,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
                 styles.historyBtn,
                 {
                   borderWidth: cardBorder,
-                  borderRadius: cardRadius * 0.7,
+                  borderRadius: 999,
                   paddingVertical: pad * 0.8,
                   paddingHorizontal: pad * 2.4,
                 },
@@ -167,9 +163,6 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
           </Pressable>
         )}
 
-        <Text style={[styles.hint, { fontSize: hintSz, marginTop: pad * 0.4 }]}>
-          An image will be chosen for you.
-        </Text>
       </View>
 
       <TouchableOpacity
@@ -191,7 +184,6 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
@@ -208,14 +200,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   contentWrap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
-  },
-  title: {
-    fontFamily: fonts.heading,
-    color: colors.darkBlue,
-    textAlign: "center",
   },
   description: {
     fontFamily: fonts.body,

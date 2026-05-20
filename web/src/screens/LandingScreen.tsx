@@ -25,13 +25,14 @@ interface Props {
   onStartSession: () => void;
   onSignUp: () => void;
   onLogIn: () => void;
+  onAbout: () => void;
 }
 
 // Width breakpoints
 const BP_SM = 700;
 const BP_MD = 1000;
 
-export default function LandingScreen({ onStartSession, onSignUp, onLogIn }: Props) {
+export default function LandingScreen({ onStartSession, onSignUp, onLogIn, onAbout }: Props) {
   const { width: winW, height: winH } = useWindowDimensions();
 
   const isLarge  = winW >  BP_MD;
@@ -85,6 +86,9 @@ export default function LandingScreen({ onStartSession, onSignUp, onLogIn }: Pro
           </Pressable>
           <Pressable onPress={onStartSession}>
             <Text style={[styles.navLink, { fontSize: navFontSize }]}>Start a Session</Text>
+          </Pressable>
+          <Pressable onPress={onAbout}>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>About</Text>
           </Pressable>
         </View>
         <View style={[styles.navRow, { gap: navGap }]}>

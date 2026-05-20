@@ -194,6 +194,8 @@ const styles = StyleSheet.create({
     right: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
+    zIndex: 10,
+    elevation: 10,
   },
   signOutText: {
     fontFamily: fonts.bodySemiBold,

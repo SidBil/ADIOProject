@@ -20,12 +20,13 @@ import SessionScreen from "./src/screens/SessionScreen";
 import SummaryScreen from "./src/screens/SummaryScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
+import AboutScreen from "./src/screens/AboutScreen";
 import { startSession as apiStartSession } from "./src/api";
 import { supabase } from "./src/lib/supabase";
 import { track } from "./src/lib/analytics";
 import { colors } from "./src/theme";
 
-type Screen = "landing" | "welcome" | "session" | "summary" | "dashboard" | "onboarding";
+type Screen = "landing" | "welcome" | "session" | "summary" | "dashboard" | "onboarding" | "about";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -148,7 +149,16 @@ export default function App() {
             onStartSession={() => setScreen("session")}
             onSignUp={() => setScreen("session")}
             onLogIn={() => setScreen("session")}
+            onAbout={() => setScreen("about")}
           />
+        </>
+      );
+    }
+    if (screen === "about") {
+      return (
+        <>
+          <StatusBar style="dark" />
+          <AboutScreen onBack={() => setScreen("landing")} />
         </>
       );
     }

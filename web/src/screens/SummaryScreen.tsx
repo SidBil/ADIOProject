@@ -32,8 +32,8 @@ function GaugeMeter({ value }: { value: number | null }) {
   const W = 200;
   const H = 120;
   const cx = W / 2;
-  const cy = H - 10;
-  const r = 75;
+  const cy = H - 12;
+  const r = 74;
   const sw = 22;
   const v = value != null ? Math.max(0, Math.min(1, value)) : 0;
 
@@ -48,14 +48,17 @@ function GaugeMeter({ value }: { value: number | null }) {
     return `M ${p1.x} ${p1.y} A ${r} ${r} 0 0 1 ${p2.x} ${p2.y}`;
   };
 
+  // 11px along radius 74 is 11/74 = 0.149 radians (~8.5 degrees).
+  // To have a nice gap of ~0.08 rad (4.5 degrees) between segments, we pull the path angles back by 0.19 rad (~11 degrees).
+  const gap = 0.19;
   const segs = [
-    { from: Math.PI, to: (2 * Math.PI) / 3, color: "#F87171" },
-    { from: (2 * Math.PI) / 3, to: Math.PI / 3, color: "#FBBF24" },
-    { from: Math.PI / 3, to: 0.02, color: "#4ADE80" },
+    { from: Math.PI - 0.08, to: (2 * Math.PI) / 3 + gap, color: "#FF7D90" }, // Smooth pink/red
+    { from: (2 * Math.PI) / 3 - gap, to: Math.PI / 3 + gap, color: "#FCD34D" }, // Smooth yellow
+    { from: Math.PI / 3 - gap, to: 0.08, color: "#97D26E" }, // Smooth green
   ];
 
   const na = Math.PI * (1 - v);
-  const nl = r * 0.75;
+  const nl = r * 0.76;
   const tip = { x: cx + nl * Math.cos(na), y: cy - nl * Math.sin(na) };
 
   return (
@@ -75,12 +78,12 @@ function GaugeMeter({ value }: { value: number | null }) {
         y1={cy}
         x2={tip.x}
         y2={tip.y}
-        stroke={colors.darkBlue}
-        strokeWidth={4}
+        stroke="#0B2265"
+        strokeWidth={7}
         strokeLinecap="round"
       />
-      <Circle cx={cx} cy={cy} r={7} fill={colors.darkBlue} />
-      <Circle cx={cx} cy={cy} r={3} fill="#fff" />
+      <Circle cx={cx} cy={cy} r={9} fill="#0B2265" />
+      <Circle cx={cx} cy={cy} r={3.5} fill="#fff" />
     </Svg>
   );
 }
@@ -94,9 +97,10 @@ function StarIcon({ size = 50 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-        fill="#FBBF24"
-        stroke="#E5A300"
-        strokeWidth={0.5}
+        fill="#FED330"
+        stroke="#D48C00"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
       />
     </Svg>
   );
@@ -215,9 +219,9 @@ export default function SummaryScreen({
           transition:
             "transform 150ms cubic-bezier(0.445,0.05,0.55,0.95), box-shadow 150ms cubic-bezier(0.445,0.05,0.55,0.95)",
           boxShadow: contPressed
-            ? "0px 0px 0px #d4a017"
-            : "0px 6px 0px #d4a017",
-          transform: contPressed ? "translateY(6px)" : "translateY(0px)",
+            ? "0px 0px 0px #E5B60D"
+            : "0px 5px 0px #E5B60D",
+          transform: contPressed ? "translateY(5px)" : "translateY(0px)",
         } as any)
       : undefined;
 
@@ -230,13 +234,14 @@ export default function SummaryScreen({
         showsVerticalScrollIndicator={false}
       >
         {/* ════════════  OUTER PINK CARD  ════════════ */}
+        {/* ════════════  OUTER PINK CARD  ════════════ */}
         <View
           style={[
             s.outerCard,
             Platform.OS === "web"
-              ? ({ boxShadow: `0px 10px 0px ${colors.pinkBorder}` } as any)
+              ? ({ boxShadow: `0px 10px 0px #FFA8BE` } as any)
               : {
-                  shadowColor: colors.pinkBorder,
+                  shadowColor: "#FFA8BE",
                   shadowOffset: { width: 0, height: 10 },
                   shadowOpacity: 1,
                   shadowRadius: 0,
@@ -248,149 +253,167 @@ export default function SummaryScreen({
             style={[
               s.bannerCard,
               Platform.OS === "web"
-                ? ({ boxShadow: `0px 6px 0px ${colors.greenBorder}` } as any)
+                ? ({ boxShadow: `0px 6px 0px #FF6B8B` } as any)
                 : {
-                    shadowColor: colors.greenBorder,
+                    shadowColor: "#FF6B8B",
                     shadowOffset: { width: 0, height: 6 },
                     shadowOpacity: 1,
                     shadowRadius: 0,
                   },
             ]}
           >
-            <StarIcon size={40} />
+            <StarIcon size={38} />
             <View style={{ flex: 1, marginLeft: 14 }}>
               <Text style={s.bannerTitle}>Great job!</Text>
               <Text style={s.bannerSub}>
-                You explored the scene and answered {answered} question
-                {answered !== 1 ? "s" : ""}.
+                You explored the scene and answered all the questions.
               </Text>
             </View>
           </View>
 
-          {/* ── Scores Grid (3 gauges + stars/continue) ── */}
+          {/* ── Scores Grid (4 side-by-side 3D cards) ── */}
           <View style={s.gridRow}>
-            {/* Left: 3 gauge cards */}
-            <View style={s.gaugesCol}>
-              {/* Understanding */}
-              <View
-                style={[
-                  s.gaugeCard,
-                  {
-                    backgroundColor: colors.greenBtn,
-                    borderColor: colors.greenBorder,
-                  },
-                  Platform.OS === "web"
-                    ? ({
-                        boxShadow: `0px 5px 0px ${colors.greenBorder}`,
-                      } as any)
-                    : {
-                        shadowColor: colors.greenBorder,
-                        shadowOffset: { width: 0, height: 5 },
-                        shadowOpacity: 1,
-                        shadowRadius: 0,
-                      },
-                ]}
-              >
-                <Text style={s.gaugeLabel}>Understanding</Text>
-                <View style={s.gaugeWrap}>
-                  <GaugeMeter value={scores.understanding} />
-                </View>
-                <Text style={s.gaugePct}>
-                  {scores.understanding != null
-                    ? `${Math.round(scores.understanding * 100)}%`
-                    : "—"}
-                </Text>
-                <Text style={s.gaugeDesc}>
-                  You understood most of what you saw!
-                </Text>
+            {/* 1. Understanding */}
+            <View
+              style={[
+                s.gaugeCard,
+                {
+                  backgroundColor: "#FFFDEB",
+                  borderColor: "#FDE047",
+                },
+                Platform.OS === "web"
+                  ? ({
+                      boxShadow: `0px 6px 0px #E5C50F`,
+                    } as any)
+                  : {
+                      shadowColor: "#E5C50F",
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    },
+              ]}
+            >
+              <Text style={s.gaugeLabel}>Understanding</Text>
+              <View style={s.gaugeWrap}>
+                <GaugeMeter value={scores.understanding} />
               </View>
-
-              {/* Observation */}
-              <View
-                style={[
-                  s.gaugeCard,
-                  {
-                    backgroundColor: colors.pinkCard,
-                    borderColor: colors.pinkBorder,
-                  },
-                  Platform.OS === "web"
-                    ? ({
-                        boxShadow: `0px 5px 0px ${colors.pinkBorder}`,
-                      } as any)
-                    : {
-                        shadowColor: colors.pinkBorder,
-                        shadowOffset: { width: 0, height: 5 },
-                        shadowOpacity: 1,
-                        shadowRadius: 0,
-                      },
-                ]}
-              >
-                <Text style={s.gaugeLabel}>Observation</Text>
-                <View style={s.gaugeWrap}>
-                  <GaugeMeter value={scores.observation} />
-                </View>
-                <Text style={s.gaugePct}>
-                  {scores.observation != null
-                    ? `${Math.round(scores.observation * 100)}%`
-                    : "—"}
-                </Text>
-                <Text style={s.gaugeDesc}>
-                  You noticed lots of great details!
-                </Text>
-              </View>
-
-              {/* Engagement */}
-              <View
-                style={[
-                  s.gaugeCard,
-                  {
-                    backgroundColor: colors.blueCard,
-                    borderColor: colors.blueBorder,
-                  },
-                  Platform.OS === "web"
-                    ? ({
-                        boxShadow: `0px 5px 0px ${colors.blueBorder}`,
-                      } as any)
-                    : {
-                        shadowColor: colors.blueBorder,
-                        shadowOffset: { width: 0, height: 5 },
-                        shadowOpacity: 1,
-                        shadowRadius: 0,
-                      },
-                ]}
-              >
-                <Text style={s.gaugeLabel}>Engagement</Text>
-                {engBuilding ? (
-                  <View style={s.buildWrap}>
-                    <Text style={s.buildText}>Building baseline…</Text>
-                    <Text style={s.buildProg}>
-                      {sessToward} / {baseMin} sessions
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <View style={s.gaugeWrap}>
-                      <GaugeMeter value={scores.engagement} />
-                    </View>
-                    <Text style={s.gaugePct}>
-                      {Math.round((scores.engagement ?? 0) * 100)}%
-                    </Text>
-                    <Text style={s.gaugeDesc}>
-                      You stayed focused and did an awesome job!
-                    </Text>
-                  </>
-                )}
-              </View>
+              <Text style={s.gaugePct}>
+                {scores.understanding != null
+                  ? `${Math.round(scores.understanding * 100)}%`
+                  : "—"}
+              </Text>
+              <Text style={s.gaugeDesc}>
+                You understood most of what you saw!
+              </Text>
             </View>
 
-            {/* Right column: Stars + Continue */}
-            <View style={s.rightCol}>
-              <Text style={s.earnedLabel}>You earned</Text>
-              <StarIcon size={80} />
+            {/* 2. Observation */}
+            <View
+              style={[
+                s.gaugeCard,
+                {
+                  backgroundColor: "#F2F9EC",
+                  borderColor: "#A2D682",
+                },
+                Platform.OS === "web"
+                  ? ({
+                      boxShadow: `0px 6px 0px #86B867`,
+                    } as any)
+                  : {
+                      shadowColor: "#86B867",
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    },
+              ]}
+            >
+              <Text style={s.gaugeLabel}>Observation</Text>
+              <View style={s.gaugeWrap}>
+                <GaugeMeter value={scores.observation} />
+              </View>
+              <Text style={s.gaugePct}>
+                {scores.observation != null
+                  ? `${Math.round(scores.observation * 100)}%`
+                  : "—"}
+              </Text>
+              <Text style={s.gaugeDesc}>
+                You noticed lots of great details!
+              </Text>
+            </View>
+
+            {/* 3. Engagement */}
+            <View
+              style={[
+                s.gaugeCard,
+                {
+                  backgroundColor: "#EDF7FC",
+                  borderColor: "#84CBEF",
+                },
+                Platform.OS === "web"
+                  ? ({
+                      boxShadow: `0px 6px 0px #61B1DA`,
+                    } as any)
+                  : {
+                      shadowColor: "#61B1DA",
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    },
+              ]}
+            >
+              <Text style={s.gaugeLabel}>Engagement</Text>
+              {engBuilding ? (
+                <View style={s.buildWrap}>
+                  <Text style={s.buildText}>Building baseline…</Text>
+                  <Text style={s.buildProg}>
+                    {sessToward} / {baseMin} sessions
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View style={s.gaugeWrap}>
+                    <GaugeMeter value={scores.engagement} />
+                  </View>
+                  <Text style={s.gaugePct}>
+                    {Math.round((scores.engagement ?? 0) * 100)}%
+                  </Text>
+                  <Text style={s.gaugeDesc}>
+                    You stayed focused and did an awesome job!
+                  </Text>
+                </>
+              )}
+            </View>
+
+            {/* 4. You earned */}
+            <View
+              style={[
+                s.earnedCard,
+                {
+                  backgroundColor: "#FFF1F5",
+                  borderColor: "#FFA8BE",
+                },
+                Platform.OS === "web"
+                  ? ({
+                      boxShadow: `0px 6px 0px #E58A9F`,
+                    } as any)
+                  : {
+                      shadowColor: "#E58A9F",
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    },
+              ]}
+            >
+              <Text style={s.gaugeLabel}>You earned</Text>
+              
+              <View style={{ marginVertical: 4 }}>
+                <StarIcon size={64} />
+              </View>
+
               <Text style={s.starCount}>
                 {starsEarned} / {total}
+                <Text style={s.starWord}> stars</Text>
               </Text>
-              <Text style={s.starWord}>stars</Text>
 
               <Pressable
                 onPress={() => {
@@ -399,7 +422,7 @@ export default function SummaryScreen({
                 }}
                 onPressIn={() => setContPressed(true)}
                 onPressOut={() => setContPressed(false)}
-                style={{ marginTop: 16, width: "100%" }}
+                style={{ width: "100%", marginTop: 8 }}
               >
                 <View
                   style={[
@@ -407,8 +430,8 @@ export default function SummaryScreen({
                     Platform.OS === "web"
                       ? { shadowOpacity: 0, elevation: 0 }
                       : {
-                          shadowColor: "#d4a017",
-                          shadowOffset: { width: 0, height: 6 },
+                          shadowColor: "#E5B60D",
+                          shadowOffset: { width: 0, height: 5 },
                           shadowOpacity: 1,
                           shadowRadius: 0,
                           elevation: 4,
@@ -428,9 +451,9 @@ export default function SummaryScreen({
             style={[
               s.encCard,
               Platform.OS === "web"
-                ? ({ boxShadow: "0px 5px 0px #B89AFF" } as any)
+                ? ({ boxShadow: "0px 5px 0px #C5B2FF" } as any)
                 : {
-                    shadowColor: "#B89AFF",
+                    shadowColor: "#C5B2FF",
                     shadowOffset: { width: 0, height: 5 },
                     shadowOpacity: 1,
                     shadowRadius: 0,
@@ -493,24 +516,24 @@ const s = StyleSheet.create({
 
   /* Outer pink card */
   outerCard: {
-    backgroundColor: "#FFF0F5",
+    backgroundColor: "#FFF5F7",
     borderWidth: 5,
-    borderColor: colors.pinkBorder,
+    borderColor: "#FFA8BE",
     borderRadius: 28,
-    padding: 16,
+    padding: 20,
     marginBottom: 24,
   },
 
   /* Great Job Banner */
   bannerCard: {
-    backgroundColor: colors.greenBtn,
+    backgroundColor: "#FFE6EC",
     borderWidth: 4,
-    borderColor: colors.greenBorder,
-    borderRadius: 20,
+    borderColor: "#FF6B8B",
+    borderRadius: 22,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
   },
   bannerTitle: {
     fontFamily: fonts.heading,
@@ -519,53 +542,58 @@ const s = StyleSheet.create({
   },
   bannerSub: {
     fontFamily: fonts.body,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.darkBlueText,
     marginTop: 2,
   },
 
-  /* Grid: gauges left, stars/continue right */
+  /* Grid: 4 equal-width 3D cards */
   gridRow: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 14,
-  },
-  gaugesCol: {
-    flex: 3,
-    flexDirection: "row",
-    gap: 10,
+    gap: 16,
+    marginBottom: 16,
   },
   gaugeCard: {
     flex: 1,
     borderWidth: 4,
-    borderRadius: 18,
-    padding: 10,
-    paddingTop: 12,
+    borderRadius: 24,
+    padding: 14,
     alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 255,
+  },
+  earnedCard: {
+    flex: 1.1,
+    borderWidth: 4,
+    borderRadius: 24,
+    padding: 14,
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 255,
   },
   gaugeLabel: {
     fontFamily: fonts.heading,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.darkBlue,
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   gaugeWrap: {
     width: "100%",
-    aspectRatio: 1.7,
+    aspectRatio: 1.75,
   },
   gaugePct: {
     fontFamily: fonts.heading,
-    fontSize: 26,
+    fontSize: 30,
     color: colors.darkBlue,
-    marginTop: -2,
+    marginTop: -4,
   },
   gaugeDesc: {
     fontFamily: fonts.body,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.darkBlueText,
     textAlign: "center",
-    lineHeight: 15,
+    lineHeight: 16,
     marginTop: 2,
   },
   buildWrap: {
@@ -587,50 +615,38 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
 
-  /* Right column */
-  rightCol: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  earnedLabel: {
-    fontFamily: fonts.heading,
-    fontSize: 16,
-    color: colors.darkBlue,
-    marginBottom: 6,
-  },
+  /* You Earned details */
   starCount: {
     fontFamily: fonts.heading,
-    fontSize: 30,
+    fontSize: 24,
     color: colors.darkBlue,
-    marginTop: 4,
+    textAlign: "center",
   },
   starWord: {
     fontFamily: fonts.body,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.darkBlueText,
   },
   contBtn: {
-    backgroundColor: colors.yellowCard,
+    backgroundColor: "#FED915",
     borderWidth: 4,
-    borderColor: "#d4a017",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderColor: "#E5B60D",
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 4,
   },
   contText: {
     fontFamily: fonts.heading,
-    fontSize: 20,
+    fontSize: 18,
     color: colors.darkBlue,
   },
   contArrow: {
     fontFamily: fonts.heading,
-    fontSize: 22,
+    fontSize: 20,
     color: colors.darkBlue,
   },
 

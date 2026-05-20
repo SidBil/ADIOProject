@@ -18,6 +18,15 @@ import { supabase } from "../lib/supabase";
 import { track } from "../lib/analytics";
 import ShapePattern from "../components/ShapePattern";
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+const privacyPdf = require("../constants/legal/Adio_Privacy_Policy.docx.pdf");
+const termsPdf = require("../constants/legal/Adio_Terms_and_Conditions.docx.pdf");
+
+const getAssetUri = (source: any) => {
+  if (typeof source === "string") return source;
+  return Image.resolveAssetSource(source)?.uri || source;
+};
+
 interface Props {
   onAuth: () => void;
 }
@@ -153,14 +162,14 @@ export default function LoginScreen({ onAuth }: Props) {
               By signing up, you agree to our{" "}
               <Text
                 style={styles.legalLink}
-                onPress={() => window.open("/Adio_Terms_and_Conditions.docx.pdf", "_blank")}
+                onPress={() => window.open(getAssetUri(termsPdf), "_blank")}
               >
                 Terms & Conditions
               </Text>
               {" and "}
               <Text
                 style={styles.legalLink}
-                onPress={() => window.open("/Adio_Privacy_Policy.docx.pdf", "_blank")}
+                onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}
               >
                 Privacy Policy
               </Text>

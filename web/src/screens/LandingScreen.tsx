@@ -5,6 +5,7 @@ import {
   Image,
   StyleSheet,
   Pressable,
+  ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { colors, fonts } from "../theme";
@@ -12,12 +13,24 @@ import { colors, fonts } from "../theme";
 /* eslint-disable @typescript-eslint/no-require-imports */
 const adioLogo = require("../../assets/adiologo.png");
 const heroImg = require("../../assets/hero_child.png");
+const privacyPdf = require("../constants/legal/Adio_Privacy_Policy.docx.pdf");
+const termsPdf = require("../constants/legal/Adio_Terms_and_Conditions.docx.pdf");
+
+const getAssetUri = (source: any) => {
+  if (typeof source === "string") return source;
+  return Image.resolveAssetSource(source)?.uri || source;
+};
 
 interface Props {
   onStartSession: () => void;
   onSignUp: () => void;
   onLogIn: () => void;
 }
+
+// Breakpoints
+const BP_SM = 700;   // phone / very small tablet
+const BP_MD = 1000;  // mid-size laptop
+// > BP_MD → large desktop (original design)
 
 export default function LandingScreen({
   onStartSession,
@@ -26,84 +39,162 @@ export default function LandingScreen({
 }: Props) {
   const { width: winW, height: winH } = useWindowDimensions();
 
+  const isLarge  = winW > BP_MD;
+  const isMedium = winW > BP_SM && winW <= BP_MD;
+  const isSmall  = winW <= BP_SM;
+
+  // Scale helpers
+  const navFontSize     = isLarge ? 30   : isMedium ? 22  : 17;
+  const navGap          = isLarge ? 56   : isMedium ? 32  : 20;
+  const navPadH         = isLarge ? 64   : isMedium ? 40  : 20;
+  const navPadTop       = isLarge ? 48   : isMedium ? 32  : 20;
+  const navPadBottom    = isLarge ? 24   : isMedium ? 16  : 12;
+
+  const logoW           = isLarge ? 400  : isMedium ? 280 : 200;
+  const logoH           = isLarge ? 168  : isMedium ? 118 : 84;
+
+  const taglineFontSize = isLarge ? 64   : isMedium ? 44  : 32;
+  const taglineLineH    = isLarge ? 76   : isMedium ? 54  : 40;
+  const taglineMB       = isLarge ? 40   : isMedium ? 28  : 20;
+
+  const sectionFontSize = isLarge ? 30   : isMedium ? 22  : 18;
+  const bulletFontSize  = isLarge ? 22   : isMedium ? 16  : 14;
+  const bulletLineH     = isLarge ? 34   : isMedium ? 26  : 22;
+  const bulletGap       = isLarge ? 14   : isMedium ? 10  : 8;
+  const bulletDotSize   = isLarge ? 24   : isMedium ? 18  : 15;
+
+  const colsGap         = isLarge ? 64   : isMedium ? 36  : 24;
+  const mainPadLeft     = isLarge ? 64   : isMedium ? 40  : 20;
+  const leftPadRight    = isLarge ? 48   : isMedium ? 24  : 16;
+
+  const footerFontSize  = isLarge ? 18   : isMedium ? 14  : 12;
+  const footerMT        = isLarge ? 48   : isMedium ? 28  : 20;
+
+  // On small screens: stack vertically, hide hero; on medium+: side-by-side
+  const mainIsRow = !isSmall;
+
+  // On small screens wrap in ScrollView so content isn't clipped
+  const ContentWrapper = isSmall ? ScrollView : View;
+  const contentWrapperProps = isSmall
+    ? { style: { flex: 1 }, contentContainerStyle: { flexGrow: 1 } }
+    : { style: { flex: 1, flexDirection: "row" as const, paddingLeft: mainPadLeft } };
+
   return (
-    <View style={[s.root, { width: winW, height: winH }]}>
+    <View style={[styles.root, { width: winW, height: winH }]}>
       {/* ═══════  TOP NAV  ═══════ */}
-      <View style={s.nav}>
-        <View style={s.navLeft}>
+      <View
+        style={[
+          styles.nav,
+          {
+            paddingTop: navPadTop,
+            paddingBottom: navPadBottom,
+            paddingHorizontal: navPadH,
+          },
+        ]}
+      >
+        <View style={[styles.navLeft, { gap: navGap }]}>
           <Pressable>
-            <Text style={s.navLink}>Home</Text>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>Home</Text>
           </Pressable>
           <Pressable onPress={onStartSession}>
-            <Text style={s.navLink}>Start a Session</Text>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>
+              Start a Session
+            </Text>
           </Pressable>
         </View>
-        <View style={s.navRight}>
+        <View style={[styles.navRight, { gap: navGap }]}>
           <Pressable onPress={onSignUp}>
-            <Text style={s.navLink}>Sign Up</Text>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>Sign Up</Text>
           </Pressable>
           <Pressable onPress={onLogIn}>
-            <Text style={s.navLink}>Log In</Text>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>Log In</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* ═══════  MAIN CONTENT — fills remaining height  ═══════ */}
-      <View style={s.main}>
-        {/* Left side */}
-        <View style={s.left}>
-          {/* Logo — cropped version, large */}
+      {/* ═══════  MAIN CONTENT  ═══════ */}
+      <ContentWrapper {...contentWrapperProps}>
+        {/* Left / only column */}
+        <View
+          style={[
+            styles.left,
+            {
+              paddingRight: mainIsRow ? leftPadRight : mainPadLeft,
+              paddingLeft: isSmall ? mainPadLeft : 0,
+              paddingBottom: isSmall ? 32 : 32,
+            },
+          ]}
+        >
           <Image
             source={adioLogo}
-            style={s.logo}
+            style={{ width: logoW, height: logoH, marginBottom: 16 }}
             resizeMode="contain"
           />
 
-          {/* Tagline */}
-          <Text style={s.tagline}>See it. Say it. Understand it.</Text>
+          <Text
+            style={[
+              styles.tagline,
+              {
+                fontSize: taglineFontSize,
+                lineHeight: taglineLineH,
+                marginBottom: taglineMB,
+              },
+            ]}
+          >
+            See it. Say it. Understand it.
+          </Text>
 
-          {/* Two content columns */}
-          <View style={s.contentCols}>
-            {/* What We Do */}
-            <View style={s.contentCol}>
-              <Text style={s.sectionTitle}>What We Do</Text>
-              <View style={s.bulletList}>
-                <Bullet text="We help children turn words into clear mental images" />
-                <Bullet text="Students describe and refine what they see to strengthen understanding" />
-                <Bullet text="Our method boosts comprehension, memory, and language skills" />
-                <Bullet text="Lessons are calm, structured, and supportive" />
-                <Bullet text="Light gamification motivates without distracting" />
-                <Bullet text="We build confidence, independent thinking, and clear communication" />
+          {/* Two content columns — stack on small */}
+          <View
+            style={[
+              styles.contentCols,
+              {
+                flexDirection: isSmall ? "column" : "row",
+                gap: colsGap,
+              },
+            ]}
+          >
+            <View style={styles.contentCol}>
+              <Text style={[styles.sectionTitle, { fontSize: sectionFontSize }]}>
+                What We Do
+              </Text>
+              <View style={[styles.bulletList, { gap: bulletGap }]}>
+                <Bullet text="We help children turn words into clear mental images"          dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Students describe and refine what they see to strengthen understanding" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Our method boosts comprehension, memory, and language skills"  dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Lessons are calm, structured, and supportive"                  dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Light gamification motivates without distracting"              dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="We build confidence, independent thinking, and clear communication" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
               </View>
             </View>
 
-            {/* How It Works */}
-            <View style={s.contentCol}>
-              <Text style={s.sectionTitle}>How It Works</Text>
-              <View style={s.bulletList}>
-                <Bullet text="Your child signs in and starts a session" />
-                <Bullet text="They describe what they see using their voice" />
-                <Bullet text="Our AI listens, evaluates, and asks follow-up questions" />
-                <Bullet text="A summary shows progress in observation, understanding, and engagement" />
-                <Bullet text="Every session is unique — no two are the same" />
+            <View style={styles.contentCol}>
+              <Text style={[styles.sectionTitle, { fontSize: sectionFontSize }]}>
+                How It Works
+              </Text>
+              <View style={[styles.bulletList, { gap: bulletGap }]}>
+                <Bullet text="Your child signs in and starts a session"                     dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="They describe what they see using their voice"                 dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Our AI listens, evaluates, and asks follow-up questions"       dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="A summary shows progress in observation, understanding, and engagement" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Every session is unique — no two are the same"                dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
               </View>
             </View>
           </View>
 
-          {/* Footer legal links */}
-          <View style={s.footer}>
-            <Text style={s.footerText}>
+          <View style={[styles.footer, { marginTop: footerMT }]}>
+            <Text style={[styles.footerText, { fontSize: footerFontSize }]}>
               © 2026 Adio. All rights reserved.{"  "}•{"  "}
               <Text
-                style={s.footerLink}
-                onPress={() => window.open("/Adio_Terms_and_Conditions.docx.pdf", "_blank")}
+                style={styles.footerLink}
+                onPress={() => window.open(getAssetUri(termsPdf), "_blank")}
               >
                 Terms & Conditions
               </Text>
               {"  "}•{"  "}
               <Text
-                style={s.footerLink}
-                onPress={() => window.open("/Adio_Privacy_Policy.docx.pdf", "_blank")}
+                style={styles.footerLink}
+                onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}
               >
                 Privacy Policy
               </Text>
@@ -111,146 +202,106 @@ export default function LandingScreen({
           </View>
         </View>
 
-        {/* Right side — hero image, bottom-anchored, sharp bottom */}
-        <View style={s.right}>
-          <View style={s.heroImageWrap}>
-            <Image
-              source={heroImg}
-              style={s.heroImage}
-              resizeMode="cover"
-            />
+        {/* Right — hero image; hidden on small screens */}
+        {mainIsRow && (
+          <View style={[styles.right, { flex: isMedium ? 0.5 : 0.65 }]}>
+            <View style={styles.heroImageWrap}>
+              <Image source={heroImg} style={styles.heroImage} resizeMode="cover" />
+            </View>
           </View>
-        </View>
-      </View>
+        )}
+      </ContentWrapper>
     </View>
   );
 }
 
 /* ── Bullet component ── */
 
-function Bullet({ text }: { text: string }) {
+function Bullet({
+  text,
+  dotSize,
+  textSize,
+  lineH,
+}: {
+  text: string;
+  dotSize: number;
+  textSize: number;
+  lineH: number;
+}) {
   return (
-    <View style={s.bulletRow}>
-      <Text style={s.bulletDot}>•</Text>
-      <Text style={s.bulletText}>{text}</Text>
+    <View style={styles.bulletRow}>
+      <Text style={[styles.bulletDot, { fontSize: dotSize, lineHeight: lineH }]}>•</Text>
+      <Text style={[styles.bulletText, { fontSize: textSize, lineHeight: lineH }]}>
+        {text}
+      </Text>
     </View>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Styles
+   Base styles (size-independent)
    ═══════════════════════════════════════════════════════════════ */
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   root: {
     backgroundColor: colors.bg,
     overflow: "hidden",
   },
 
-  /* ── Nav ── */
   nav: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 48,
-    paddingBottom: 24,
-    paddingHorizontal: 64,
   },
-  navLeft: {
-    flexDirection: "row",
-    gap: 56,
-  },
-  navRight: {
-    flexDirection: "row",
-    gap: 56,
-  },
+  navLeft: { flexDirection: "row" },
+  navRight: { flexDirection: "row" },
   navLink: {
     fontFamily: fonts.heading,
-    fontSize: 30,
     color: colors.darkBlue,
   },
 
-  /* ── Main content area — fills remaining height ── */
-  main: {
-    flex: 1,
-    flexDirection: "row",
-    paddingLeft: 64,
-  },
-
-  /* ── Left column ── */
   left: {
     flex: 1,
     justifyContent: "center",
-    paddingRight: 48,
-    paddingBottom: 32,
   },
 
-  /* ── Logo ── */
-  logo: {
-    width: 400,
-    height: 168,
-    marginBottom: 16,
-  },
-
-  /* ── Tagline ── */
   tagline: {
     fontFamily: fonts.heading,
-    fontSize: 64,
     color: colors.darkBlue,
-    lineHeight: 76,
-    marginBottom: 40,
   },
 
-  /* ── Content columns ── */
-  contentCols: {
-    flexDirection: "row",
-    gap: 64,
-  },
-  contentCol: {
-    flex: 1,
-  },
+  contentCols: {},
+  contentCol: { flex: 1 },
+
   sectionTitle: {
     fontFamily: fonts.heading,
-    fontSize: 30,
     color: colors.darkBlue,
     marginBottom: 20,
   },
 
-  /* ── Bullets ── */
-  bulletList: {
-    gap: 14,
-  },
+  bulletList: {},
   bulletRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
   bulletDot: {
     fontFamily: fonts.body,
-    fontSize: 24,
     color: colors.darkBlue,
     marginRight: 14,
-    lineHeight: 34,
   },
   bulletText: {
     fontFamily: fonts.body,
-    fontSize: 22,
     color: colors.darkBlueText,
-    lineHeight: 34,
     flex: 1,
   },
 
-  /* ── Right column — hero image ── */
   right: {
-    flex: 0.65,
     justifyContent: "flex-end",
   },
-
   heroImageWrap: {
     flex: 1,
     borderTopLeftRadius: 999,
     borderTopRightRadius: 999,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
     overflow: "hidden",
     backgroundColor: "#E0EAF5",
   },
@@ -258,17 +309,15 @@ const s = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  footer: {
-    marginTop: 48,
-  },
+
+  footer: {},
   footerText: {
     fontFamily: fonts.body,
-    fontSize: 18,
-    color: colors.textMuted || "#666680",
+    color: colors.textMuted,
     lineHeight: 26,
   },
   footerLink: {
-    fontFamily: fonts.bodySemiBold || fonts.heading,
+    fontFamily: fonts.bodySemiBold,
     color: colors.darkBlue,
     textDecorationLine: "underline",
   },

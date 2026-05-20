@@ -246,14 +246,6 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
       {/* ════════  MAIN CONTENT — centered in remaining space ════════ */}
       <View style={[s.main, { paddingHorizontal: pad, paddingBottom: pad, gap: pad * 1.5, flex: 1, justifyContent: "center" }]}>
 
-        {/* ── Great Job ── */}
-        <View>
-          <Text style={[s.bannerTitle, { fontSize: bannerTitleSz }]}>Great job!</Text>
-          <Text style={[s.bannerSub, { fontSize: bannerSubSz, marginTop: 4 }]}>
-            {bannerMessage(answered, total)}
-          </Text>
-        </View>
-
         {/* ── 3 Gauges — full width ── */}
         <View style={{ flexDirection: isMobile ? "column" : "row", gap: cardGap, marginTop: pad * 1.5 }}>
           <GaugeCard label="Understanding" scores={scores} scoreKey="understanding"
@@ -352,7 +344,11 @@ function GaugeCard(props: {
   const value = scores[scoreKey] as number | null | undefined;
 
   return (
-    <View style={[s.gaugeCard, { flex: 1, alignItems: "center", paddingHorizontal: pad * 0.4 }]}>
+    <View style={[s.gaugeCard, {
+      flex: 1, alignItems: "center", paddingHorizontal: pad * 0.4,
+      borderWidth: 6, borderColor: colors.darkBlue, borderRadius: 16, backgroundColor: colors.bg,
+      paddingVertical: pad * 0.6,
+    }]}>
       <Text style={[s.gaugeLabel, { fontSize: labelSz, marginBottom: pad * 0.2 }]}>{label}</Text>
 
       {engBuilding && scoreKey === "engagement" ? (

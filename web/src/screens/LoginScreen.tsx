@@ -148,6 +148,26 @@ export default function LoginScreen({ onAuth }: Props) {
             textColor={colors.darkBlue}
           />
 
+          {isSignUp && (
+            <Text style={styles.legalText}>
+              By signing up, you agree to our{" "}
+              <Text
+                style={styles.legalLink}
+                onPress={() => window.open("/Adio_Terms_and_Conditions.docx.pdf", "_blank")}
+              >
+                Terms & Conditions
+              </Text>
+              {" and "}
+              <Text
+                style={styles.legalLink}
+                onPress={() => window.open("/Adio_Privacy_Policy.docx.pdf", "_blank")}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          )}
+
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>
@@ -277,6 +297,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.darkBlue,
     textAlign: "center",
+  },
+  legalText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.textMuted || "#666680",
+    textAlign: "center",
+    marginTop: 16,
+    lineHeight: 20,
+    paddingHorizontal: 10,
+  },
+  legalLink: {
+    color: colors.darkBlue,
+    textDecorationLine: "underline",
+    fontFamily: fonts.bodySemiBold,
   },
 });
 

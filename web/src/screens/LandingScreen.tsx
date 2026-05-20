@@ -89,6 +89,26 @@ export default function LandingScreen({
               </View>
             </View>
           </View>
+
+          {/* Footer legal links */}
+          <View style={s.footer}>
+            <Text style={s.footerText}>
+              © 2026 Adio. All rights reserved.{"  "}•{"  "}
+              <Text
+                style={s.footerLink}
+                onPress={() => window.open("/Adio_Terms_and_Conditions.docx.pdf", "_blank")}
+              >
+                Terms & Conditions
+              </Text>
+              {"  "}•{"  "}
+              <Text
+                style={s.footerLink}
+                onPress={() => window.open("/Adio_Privacy_Policy.docx.pdf", "_blank")}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
         </View>
 
         {/* Right side — hero image, bottom-anchored, sharp bottom */}
@@ -237,5 +257,19 @@ const s = StyleSheet.create({
   heroImage: {
     width: "100%",
     height: "100%",
+  },
+  footer: {
+    marginTop: 48,
+  },
+  footerText: {
+    fontFamily: fonts.body,
+    fontSize: 18,
+    color: colors.textMuted || "#666680",
+    lineHeight: 26,
+  },
+  footerLink: {
+    fontFamily: fonts.bodySemiBold || fonts.heading,
+    color: colors.darkBlue,
+    textDecorationLine: "underline",
   },
 });

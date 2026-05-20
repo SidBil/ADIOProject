@@ -13,13 +13,14 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
-import { getSummary, imageUrl } from "../api";
+import { getSummary } from "../api";
 import { supabase } from "../lib/supabase";
 import ShapePattern from "../components/ShapePattern";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const gaugeArcImg = require("../../assets/Untitled-6-01.png");
+const gaugeArcImg    = require("../../assets/Untitled-6-01.png");
 const gaugeNeedleImg = require("../../assets/spinner.png");
+const adioLogo       = require("../../assets/adiologo.png");
 
 interface Props {
   sessionId: string;
@@ -29,85 +30,39 @@ interface Props {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Gauge Meter — PNG arc image + rotated PNG needle
-   Arc image: 300×150 (2:1).  Needle image: 172×46.
-   The needle's circle hub is at roughly (23, 23) from its top-left.
+   Gauge Meter
    ═══════════════════════════════════════════════════════════════ */
 
 function GaugeMeter({ value }: { value: number | null }) {
   const v = value != null ? Math.max(0, Math.min(1, value)) : 0;
-  // 0% → 180° (points left), 50% → 90° (points up), 100% → 0° (points right)
-  // CSS rotate: positive = clockwise. Our needle PNG points right at 0°.
-  // So at v=0: rotate 180°. At v=1: rotate 0°.
   const angleDeg = 180 - v * 180;
-
-  // The needle image is 172×46. The circle hub center is at ~(23, 23).
-  // We render the needle at a size proportional to the gauge.
-  // Needle display width = 55% of gauge width gives a good visual.
-  // Needle display height = (46/172) * needleWidth.
-  // The hub center as fraction: x=23/172 ≈ 13.4%, y=23/46 = 50%.
-
   return (
     <View style={gS.wrap}>
-      {/* Arc background */}
       <Image source={gaugeArcImg} style={gS.arc} resizeMode="contain" />
-
-      {/* Needle — absolutely positioned so hub sits at arc center-bottom */}
       <View
         style={[
           gS.needleContainer,
-          {
-            transform: [{ rotate: `${angleDeg}deg` }],
-          } as any,
-          Platform.OS === "web"
-            ? ({ transformOrigin: "13.4% 50%" } as any)
-            : {},
+          { transform: [{ rotate: `${angleDeg}deg` }] } as any,
+          Platform.OS === "web" ? ({ transformOrigin: "13.4% 50%" } as any) : {},
         ]}
       >
-        <Image
-          source={gaugeNeedleImg}
-          style={gS.needleImg}
-          resizeMode="contain"
-        />
+        <Image source={gaugeNeedleImg} style={gS.needleImg} resizeMode="contain" />
       </View>
     </View>
   );
 }
 
-const NEEDLE_W_PCT = 55; // % of gauge width
-const NEEDLE_ASPECT = 46 / 172; // height/width of the needle image
-const HUB_X_FRAC = 23 / 172; // hub center x as fraction of needle width
-
+const NEEDLE_W_PCT = 55;
+const HUB_X_FRAC = 23 / 172;
 const gS = StyleSheet.create({
-  wrap: {
-    width: "100%",
-    aspectRatio: 2,
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  arc: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-  },
+  wrap: { width: "100%", aspectRatio: 2, position: "relative", alignItems: "center", justifyContent: "flex-end" },
+  arc: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%" },
   needleContainer: {
-    position: "absolute",
-    // Position so the hub center aligns with arc center-bottom.
-    // The hub is at 13.4% of needle width from left.
-    // So we shift left by (50% - 13.4% * NEEDLE_W_PCT%).
-    // needleContainer.left = 50% - hubOffsetPx. We approximate:
-    bottom: -2,
+    position: "absolute", bottom: -2,
     left: `${50 - HUB_X_FRAC * NEEDLE_W_PCT}%` as any,
-    width: `${NEEDLE_W_PCT}%` as any,
-    aspectRatio: 172 / 46,
+    width: `${NEEDLE_W_PCT}%` as any, aspectRatio: 172 / 46,
   },
-  needleImg: {
-    width: "100%",
-    height: "100%",
-  },
+  needleImg: { width: "100%", height: "100%" },
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -119,23 +74,17 @@ function StarIcon({ size = 50 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-        fill="#FED330"
-        stroke="#D48C00"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
+        fill={colors.yellowCard} stroke={colors.yellowBorder} strokeWidth={1.5} strokeLinejoin="round"
       />
     </Svg>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Dynamic message helpers
+   Helpers
    ═══════════════════════════════════════════════════════════════ */
 
-function gaugeMessage(
-  kind: "understanding" | "observation" | "engagement",
-  v: number | null
-): string {
+function gaugeMessage(kind: "understanding" | "observation" | "engagement", v: number | null): string {
   if (v == null) return "";
   const pct = Math.round(v * 100);
   if (kind === "understanding") {
@@ -148,57 +97,32 @@ function gaugeMessage(
     if (pct >= 50) return "Good eye! Try spotting even more next time.";
     return "Look closely — there's so much to find!";
   }
-  // engagement
   if (pct >= 80) return "You stayed focused and did an awesome job!";
   if (pct >= 50) return "Nice focus! Let's keep it going.";
   return "Try to stay focused a little longer next time!";
 }
 
 function bannerMessage(answered: number, total: number): string {
-  if (answered >= total && total > 0)
-    return "You explored the scene and answered all the questions.";
-  if (answered > 0)
-    return `You explored the scene and answered ${answered} question${answered !== 1 ? "s" : ""}.`;
+  if (answered >= total && total > 0) return "You explored the scene and answered all the questions.";
+  if (answered > 0) return `You explored the scene and answered ${answered} question${answered !== 1 ? "s" : ""}.`;
   return "You explored the scene and answered 0 questions.";
 }
 
-function encouragement(avg: number | null): {
-  title: string;
-  message: string;
-} {
-  if (avg != null && avg >= 0.8)
-    return {
-      title: "Amazing work!",
-      message:
-        "You're really getting the hang of describing what you see!",
-    };
-  if (avg != null && avg >= 0.5)
-    return {
-      title: "Keep it up!",
-      message:
-        "The more you practice, the better you'll become at spotting details!",
-    };
-  return {
-    title: "Great effort!",
-    message: "Every session helps you get better. Keep practicing!",
-  };
+function encouragement(avg: number | null): { title: string; message: string } {
+  if (avg != null && avg >= 0.8) return { title: "Amazing work!", message: "You're really getting the hang of describing what you see!" };
+  if (avg != null && avg >= 0.5) return { title: "Keep it up!", message: "The more you practice, the better you'll become at spotting details!" };
+  return { title: "Great effort!", message: "Every session helps you get better. Keep practicing!" };
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Main Summary Screen
    ═══════════════════════════════════════════════════════════════ */
 
-export default function SummaryScreen({
-  sessionId,
-  imageId,
-  userId,
-  onNewSession,
-}: Props) {
-  const { width: winW } = useWindowDimensions();
+export default function SummaryScreen({ sessionId, imageId, userId, onNewSession }: Props) {
+  const { width: winW, height: winH } = useWindowDimensions();
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const saved = useRef(false);
-  const [burstCount, setBurstCount] = useState(0);
   const [contPressed, setContPressed] = useState(false);
 
   useEffect(() => {
@@ -208,43 +132,31 @@ export default function SummaryScreen({
         if (!saved.current) {
           saved.current = true;
           const history = (d.qa_history || []).map((item: any) => ({
-            question: item.question,
-            structure_word: item.structure_word,
-            expected_answer: item.expected_answer,
-            transcription: item.transcription,
-            evaluation: item.evaluation,
-            followup: item.followup,
+            question: item.question, structure_word: item.structure_word,
+            expected_answer: item.expected_answer, transcription: item.transcription,
+            evaluation: item.evaluation, followup: item.followup,
             initiation_latency_ms: item.initiation_latency_ms,
           }));
           const sc = d.scores || {};
-          supabase
-            .from("sessions")
-            .insert({
-              user_id: userId,
-              session_id: sessionId,
-              image_id: imageId || d.image_id || null,
-              questions_answered: d.progress?.answered ?? 0,
-              total_questions: d.progress?.total ?? 0,
-              qa_history: history,
-              avg_latency_ms: sc.avg_latency_ms ?? null,
-              observation_score: sc.observation ?? null,
-              understanding_score: sc.understanding ?? null,
-              engagement_score: sc.engagement ?? null,
-            })
-            .then(({ error: err }) => {
-              if (err) console.warn("Save failed:", err.message);
-            });
+          supabase.from("sessions").insert({
+            user_id: userId, session_id: sessionId,
+            image_id: imageId || d.image_id || null,
+            questions_answered: d.progress?.answered ?? 0,
+            total_questions: d.progress?.total ?? 0,
+            qa_history: history,
+            avg_latency_ms: sc.avg_latency_ms ?? null,
+            observation_score: sc.observation ?? null,
+            understanding_score: sc.understanding ?? null,
+            engagement_score: sc.engagement ?? null,
+          }).then(({ error: err }) => { if (err) console.warn("Save failed:", err.message); });
         }
       })
       .catch((e) => setError(e.message));
   }, [sessionId]);
 
-  /* ── Loading / Error states ── */
-
   if (error) {
     return (
       <View style={s.center}>
-        <ShapePattern />
         <Text style={s.errorText}>Could not load summary: {error}</Text>
         <TouchableOpacity style={s.retryBtn} onPress={onNewSession}>
           <Text style={s.retryBtnText}>Try Again</Text>
@@ -255,13 +167,10 @@ export default function SummaryScreen({
   if (!data) {
     return (
       <View style={s.center}>
-        <ShapePattern />
         <ActivityIndicator size="large" color={colors.darkBlue} />
       </View>
     );
   }
-
-  /* ── Derived data ── */
 
   const progress = data.progress || {};
   const history: any[] = data.qa_history || [];
@@ -278,526 +187,344 @@ export default function SummaryScreen({
   const sessToward = scores.sessions_toward_baseline ?? 0;
   const baseMin = scores.baseline_min_sessions ?? 3;
 
-  const avg =
-    scores.observation != null && scores.understanding != null
-      ? (scores.observation + scores.understanding) / 2
-      : null;
-  const enc = encouragement(avg);
+  const contWebStyle = Platform.OS === "web" ? ({
+    transition: "transform 150ms ease, box-shadow 150ms ease",
+    boxShadow: contPressed ? `0px 0px 0px ${colors.yellowBorder}` : `0px 6px 0px ${colors.yellowBorder}`,
+    transform: contPressed ? "translateY(6px)" : "translateY(0px)",
+  } as any) : undefined;
 
-  const contWebStyle =
-    Platform.OS === "web"
-      ? ({
-          transition:
-            "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: contPressed
-            ? "0px 0px 0px #D4A017"
-            : "0px 5px 0px #D4A017",
-          transform: contPressed ? "translateY(5px)" : "translateY(0px)",
-        } as any)
-      : undefined;
+  // Generous responsive scaling — heavily biased toward LARGE text
+  const pad           = Math.max(14, winW * 0.018);
+  const titleBarH     = Math.max(36, winH * 0.05);
+  const titleFontSz   = Math.max(32, Math.min(56, winH * 0.07));
+  const logoH         = titleBarH;
+  const logoW         = logoH * 2.4;
 
-  const maxW = Math.min(winW - 32, 750);
+  const bannerTitleSz = Math.max(38, Math.min(64, winH * 0.08));
+  const bannerSubSz   = Math.max(20, Math.min(30, winH * 0.038));
 
-  /* ── Render ── */
+  const gaugeLabelSz  = Math.max(36, Math.min(56, winH * 0.07));
+  const gaugePctSz    = Math.max(40, Math.min(72, winH * 0.09));
+  const gaugeDescSz   = Math.max(15, Math.min(22, winH * 0.026));
+
+  const starIconSz    = Math.max(80, Math.min(140, winH * 0.18));
+  const earnedSz      = Math.max(36, Math.min(56, winH * 0.07));
+  const starCountSz   = Math.max(34, Math.min(54, winH * 0.066));
+  const starWordSz    = Math.max(20, Math.min(30, winH * 0.036));
+  const contFontSz    = Math.max(24, Math.min(36, winH * 0.045));
+
+  const cardGap       = Math.max(10, winW * 0.012);
+  const cardBorder    = Math.max(4, Math.min(6, winH * 0.007));
+  const cardRadius    = Math.max(20, winH * 0.03);
 
   return (
-    <View style={s.root}>
-      <ShapePattern burst={burstCount} />
+    <View style={[s.root, { width: winW, height: winH }]}>
+      <ShapePattern />
+
+      {/* ════════  TOP BAR: logo + plain title text ════════ */}
+      <View style={[s.topBar, { paddingHorizontal: pad, paddingTop: pad, paddingBottom: pad * 0.3 }]}>
+        <Image source={adioLogo} style={{ width: logoW, height: logoH }} resizeMode="contain" />
+        <Text style={[s.titleText, { fontSize: titleFontSz, marginLeft: pad * 1.2 }]}>Session Summary</Text>
+      </View>
+
+      {/* ════════  MAIN CONTENT ════════ */}
+      <View style={[s.main, { paddingHorizontal: pad, paddingTop: pad * 1.5, gap: pad }]}>
+
+        {/* ── Great Job — plain left-aligned text, no card ── */}
+        <View>
+          <Text style={[s.bannerTitle, { fontSize: bannerTitleSz }]}>Great job!</Text>
+          <Text style={[s.bannerSub, { fontSize: bannerSubSz, marginTop: 4 }]}>
+            {bannerMessage(answered, total)}
+          </Text>
+        </View>
+
+        {/* ── Scores row: 3 colored gauges + pink stars card (all flex: 1) ── */}
+        <View style={[s.scoresRow, { gap: cardGap }]}>
+
+          {/* Understanding — YELLOW */}
+          <GaugeCard
+            label="Understanding"
+            bg={colors.yellowCard}
+            border={colors.yellowBorder}
+            scores={scores}
+            scoreKey="understanding"
+            engBuilding={false}
+            sessToward={0}
+            baseMin={0}
+            cardBorder={cardBorder}
+            cardRadius={cardRadius}
+            labelSz={gaugeLabelSz}
+            pctSz={gaugePctSz}
+            descSz={gaugeDescSz}
+            pad={pad}
+          />
+
+          {/* Observation — GREEN */}
+          <GaugeCard
+            label="Observation"
+            bg={colors.greenBtn}
+            border={colors.greenBorder}
+            scores={scores}
+            scoreKey="observation"
+            engBuilding={false}
+            sessToward={0}
+            baseMin={0}
+            cardBorder={cardBorder}
+            cardRadius={cardRadius}
+            labelSz={gaugeLabelSz}
+            pctSz={gaugePctSz}
+            descSz={gaugeDescSz}
+            pad={pad}
+          />
+
+          {/* Engagement — BLUE */}
+          <GaugeCard
+            label="Engagement"
+            bg={colors.blueCard}
+            border={colors.blueBorder}
+            scores={scores}
+            scoreKey="engagement"
+            engBuilding={engBuilding}
+            sessToward={sessToward}
+            baseMin={baseMin}
+            cardBorder={cardBorder}
+            cardRadius={cardRadius}
+            labelSz={gaugeLabelSz}
+            pctSz={gaugePctSz}
+            descSz={gaugeDescSz}
+            pad={pad}
+          />
+
+          {/* Stars + Continue — PINK */}
+          <View style={[s.starsCard, {
+            backgroundColor: colors.pinkCard,
+            borderColor: colors.pinkBorder,
+            borderWidth: cardBorder,
+            borderRadius: cardRadius,
+            paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
+          },
+            Platform.OS === "web"
+              ? ({ boxShadow: `0px ${cardBorder}px 0px ${colors.pinkBorder}` } as any)
+              : { shadowColor: colors.pinkBorder, shadowOffset: { width: 0, height: cardBorder }, shadowOpacity: 1, shadowRadius: 0 },
+          ]}>
+            <Text style={[s.earnedLabel, { fontSize: earnedSz, marginBottom: pad * 0.4 }]}>You earned</Text>
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <StarIcon size={starIconSz} />
+              <Text style={[s.starCount, { fontSize: starCountSz, marginTop: pad * 0.4 }]}>{starsEarned} / {total}</Text>
+              <Text style={[s.starWord, { fontSize: starWordSz }]}>stars</Text>
+            </View>
+
+            <Pressable
+              onPress={onNewSession}
+              onPressIn={() => setContPressed(true)}
+              onPressOut={() => setContPressed(false)}
+              style={{ marginTop: pad * 1.4, width: "100%" }}
+            >
+              <View style={[s.contBtn, {
+                borderWidth: cardBorder,
+                borderRadius: cardRadius * 0.6,
+                paddingVertical: pad * 0.7,
+                paddingHorizontal: pad,
+              },
+                Platform.OS === "web" ? { shadowOpacity: 0, elevation: 0 } : {
+                  shadowColor: colors.yellowBorder, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 1, shadowRadius: 0, elevation: 4,
+                },
+                contWebStyle,
+              ]}>
+                <Text style={[s.contText, { fontSize: contFontSz }]}>Continue</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {/* ════════  QUESTION HISTORY — scrollable, always below summary ════════ */}
       <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollInner}
+        style={[s.histScroll, { paddingHorizontal: pad, marginTop: pad }]}
+        contentContainerStyle={{ paddingBottom: pad * 2 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ width: maxW, alignSelf: "center" }}>
-
-          {/* ═══════  OUTER PINK CARD  ═══════ */}
-          <View
-            style={[
-              s.outerCard,
-              Platform.OS === "web"
-                ? ({ boxShadow: "0px 8px 0px #FFA8BE" } as any)
-                : {
-                    shadowColor: "#FFA8BE",
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 1,
-                    shadowRadius: 0,
-                  },
-            ]}
-          >
-            {/* ── Great job banner ── */}
-            <View
-              style={[
-                s.banner,
-                Platform.OS === "web"
-                  ? ({ boxShadow: "0px 5px 0px #B5CC26" } as any)
-                  : {
-                      shadowColor: "#B5CC26",
-                      shadowOffset: { width: 0, height: 5 },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                    },
-              ]}
-            >
-              <StarIcon size={42} />
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={s.bannerTitle}>Great job!</Text>
-                <Text style={s.bannerSub}>
-                  {bannerMessage(answered, total)}
-                </Text>
+        <Text style={[s.histTitle, { fontSize: bannerTitleSz * 0.7, marginBottom: pad }]}>Question History</Text>
+        {history.map((item: any, idx: number) => {
+          const fb = item.followup || item.evaluation?.feedback || "";
+          const lat = item.initiation_latency_ms;
+          return (
+            <View key={idx} style={[s.histItem, { borderWidth: cardBorder - 1, padding: pad, borderRadius: cardRadius * 0.7, marginBottom: pad * 0.7 }]}>
+              <View style={s.histHead}>
+                <Text style={[s.histQ, { fontSize: gaugeDescSz + 6 }]}>{item.question}</Text>
+                {lat != null && <Text style={[s.histLat, { fontSize: gaugeDescSz + 2 }]}>{(lat / 1000).toFixed(1)}s</Text>}
               </View>
+              <Text style={[s.histDet, { fontSize: gaugeDescSz + 3 }]}>
+                <Text style={{ fontWeight: "700" }}>Expected: </Text>{item.expected_answer || "—"}
+              </Text>
+              <Text style={[s.histDet, { fontSize: gaugeDescSz + 3 }]}>
+                <Text style={{ fontWeight: "700" }}>You said: </Text>{item.transcription || "—"}
+              </Text>
+              {fb ? <Text style={[s.histFb, { fontSize: gaugeDescSz + 2 }]}>"{fb}"</Text> : null}
             </View>
-
-            {/* ── Scores row: 3 gauges + stars column ── */}
-            <View style={s.scoresRow}>
-              {/* Gauge cards (3 side by side) */}
-              <View style={s.gaugesRow}>
-                {/* Understanding */}
-                <View
-                  style={[
-                    s.gaugeCard,
-                    {
-                      backgroundColor: colors.greenBtn,
-                      borderColor: colors.greenBorder,
-                    },
-                    Platform.OS === "web"
-                      ? ({
-                          boxShadow: `0px 5px 0px ${colors.greenBorder}`,
-                        } as any)
-                      : {
-                          shadowColor: colors.greenBorder,
-                          shadowOffset: { width: 0, height: 5 },
-                          shadowOpacity: 1,
-                          shadowRadius: 0,
-                        },
-                  ]}
-                >
-                  <Text style={s.gaugeLabel}>Understanding</Text>
-                  <View style={s.gaugeWrap}>
-                    <GaugeMeter value={scores.understanding} />
-                  </View>
-                  <Text style={s.gaugeDesc}>
-                    {gaugeMessage("understanding", scores.understanding)}
-                  </Text>
-                </View>
-
-                {/* Observation */}
-                <View
-                  style={[
-                    s.gaugeCard,
-                    {
-                      backgroundColor: colors.pinkCard,
-                      borderColor: colors.pinkBorder,
-                    },
-                    Platform.OS === "web"
-                      ? ({
-                          boxShadow: `0px 5px 0px ${colors.pinkBorder}`,
-                        } as any)
-                      : {
-                          shadowColor: colors.pinkBorder,
-                          shadowOffset: { width: 0, height: 5 },
-                          shadowOpacity: 1,
-                          shadowRadius: 0,
-                        },
-                  ]}
-                >
-                  <Text style={s.gaugeLabel}>Observation</Text>
-                  <View style={s.gaugeWrap}>
-                    <GaugeMeter value={scores.observation} />
-                  </View>
-                  <Text style={s.gaugeDesc}>
-                    {gaugeMessage("observation", scores.observation)}
-                  </Text>
-                </View>
-
-                {/* Engagement */}
-                <View
-                  style={[
-                    s.gaugeCard,
-                    {
-                      backgroundColor: colors.blueCard,
-                      borderColor: colors.blueBorder,
-                    },
-                    Platform.OS === "web"
-                      ? ({
-                          boxShadow: `0px 5px 0px ${colors.blueBorder}`,
-                        } as any)
-                      : {
-                          shadowColor: colors.blueBorder,
-                          shadowOffset: { width: 0, height: 5 },
-                          shadowOpacity: 1,
-                          shadowRadius: 0,
-                        },
-                  ]}
-                >
-                  <Text style={s.gaugeLabel}>Engagement</Text>
-                  {engBuilding ? (
-                    <View style={s.buildWrap}>
-                      <Text style={s.buildText}>Building baseline…</Text>
-                      <Text style={s.buildProg}>
-                        {sessToward} / {baseMin} sessions
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      <View style={s.gaugeWrap}>
-                        <GaugeMeter value={scores.engagement} />
-                      </View>
-                      <Text style={s.gaugeDesc}>
-                        {gaugeMessage("engagement", scores.engagement)}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </View>
-
-              {/* Stars + Continue column */}
-              <View style={s.rightCol}>
-                <Text style={s.earnedLabel}>You earned</Text>
-                <StarIcon size={80} />
-                <Text style={s.starCount}>
-                  {starsEarned} / {total}
-                </Text>
-                <Text style={s.starWord}>stars</Text>
-
-                <Pressable
-                  onPress={() => {
-                    setBurstCount((n) => n + 1);
-                    onNewSession();
-                  }}
-                  onPressIn={() => setContPressed(true)}
-                  onPressOut={() => setContPressed(false)}
-                  style={{ marginTop: 14, width: "100%" }}
-                >
-                  <View
-                    style={[
-                      s.contBtn,
-                      Platform.OS === "web"
-                        ? { shadowOpacity: 0, elevation: 0 }
-                        : {
-                            shadowColor: "#D4A017",
-                            shadowOffset: { width: 0, height: 5 },
-                            shadowOpacity: 1,
-                            shadowRadius: 0,
-                            elevation: 4,
-                          },
-                      contWebStyle,
-                    ]}
-                  >
-                    <Text style={s.contText}>Continue</Text>
-                    <Text style={s.contArrow}>›</Text>
-                  </View>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* ── Encouragement strip ── */}
-            <View
-              style={[
-                s.encCard,
-                Platform.OS === "web"
-                  ? ({ boxShadow: "0px 5px 0px #C5B2FF" } as any)
-                  : {
-                      shadowColor: "#C5B2FF",
-                      shadowOffset: { width: 0, height: 5 },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                    },
-              ]}
-            >
-              <Text style={{ fontSize: 28 }}>💡</Text>
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={s.encTitle}>{enc.title}</Text>
-                <Text style={s.encMsg}>{enc.message}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* ═══════  QUESTION HISTORY  ═══════ */}
-          <Text style={s.histTitle}>Question History</Text>
-          {history.map((item: any, idx: number) => {
-            const fb = item.followup || item.evaluation?.feedback || "";
-            const lat = item.initiation_latency_ms;
-            return (
-              <View key={idx} style={s.histItem}>
-                <View style={s.histHead}>
-                  <Text style={s.histQ}>{item.question}</Text>
-                  {lat != null && (
-                    <Text style={s.histLat}>
-                      {(lat / 1000).toFixed(1)}s
-                    </Text>
-                  )}
-                </View>
-                <Text style={s.histDet}>
-                  <Text style={{ fontWeight: "700" }}>Expected: </Text>
-                  {item.expected_answer || "—"}
-                </Text>
-                <Text style={s.histDet}>
-                  <Text style={{ fontWeight: "700" }}>You said: </Text>
-                  {item.transcription || "—"}
-                </Text>
-                {fb ? <Text style={s.histFb}>"{fb}"</Text> : null}
-              </View>
-            );
-          })}
-          <View style={{ height: 40 }} />
-        </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
 }
 
+/* ── GaugeCard subcomponent ─────────────────────────────────── */
+
+function GaugeCard(props: {
+  label: string;
+  bg: string;
+  border: string;
+  scores: any;
+  scoreKey: "understanding" | "observation" | "engagement";
+  engBuilding: boolean;
+  sessToward: number;
+  baseMin: number;
+  cardBorder: number;
+  cardRadius: number;
+  labelSz: number;
+  pctSz: number;
+  descSz: number;
+  pad: number;
+}) {
+  const { label, bg, border, scores, scoreKey, engBuilding, sessToward, baseMin,
+          cardBorder, cardRadius, labelSz, pctSz, descSz, pad } = props;
+  const value = scores[scoreKey] as number | null | undefined;
+
+  return (
+    <View style={[s.gaugeCard, {
+      backgroundColor: bg, borderColor: border, borderWidth: cardBorder, borderRadius: cardRadius,
+      paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
+    },
+      Platform.OS === "web"
+        ? ({ boxShadow: `0px ${cardBorder}px 0px ${border}` } as any)
+        : { shadowColor: border, shadowOffset: { width: 0, height: cardBorder }, shadowOpacity: 1, shadowRadius: 0 },
+    ]}>
+      <Text style={[s.gaugeLabel, { fontSize: labelSz, marginBottom: pad * 0.4 }]}>{label}</Text>
+
+      {engBuilding && scoreKey === "engagement" ? (
+        <View style={s.buildWrap}>
+          <Text style={[s.buildText, { fontSize: labelSz * 0.7 }]}>Building baseline…</Text>
+          <Text style={[s.buildProg, { fontSize: descSz, marginTop: 8 }]}>{sessToward} / {baseMin} sessions</Text>
+        </View>
+      ) : (
+        <View style={{ flex: 1, width: "100%", alignItems: "center", justifyContent: "center" }}>
+          <View style={s.gaugeWrap}>
+            <GaugeMeter value={value ?? null} />
+          </View>
+          <Text style={[s.gaugePct, { fontSize: pctSz, marginTop: pad * 0.2 }]}>
+            {value != null ? `${Math.round(value * 100)}%` : "—"}
+          </Text>
+          <Text style={[s.gaugeDesc, { fontSize: descSz, marginTop: pad * 0.3, paddingHorizontal: pad * 0.3 }]}>
+            {gaugeMessage(scoreKey, value ?? null)}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   Styles  —  ALL text scaled up for readability
+   Styles
    ═══════════════════════════════════════════════════════════════ */
 
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  center: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scroll: { flex: 1 },
-  scrollInner: {
-    padding: 20,
-    paddingTop: 28,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
 
-  /* ── Outer pink card ── */
-  outerCard: {
-    backgroundColor: "#FFF5F7",
-    borderWidth: 5,
-    borderColor: "#FFA8BE",
-    borderRadius: 28,
-    padding: 18,
-    marginBottom: 28,
-  },
-
-  /* ── Great Job banner ── */
-  banner: {
-    backgroundColor: colors.greenBtn,
-    borderWidth: 4,
-    borderColor: colors.greenBorder,
-    borderRadius: 22,
-    padding: 18,
+  /* ── Top bar ── */
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
   },
-  bannerTitle: {
+  titleText: {
     fontFamily: fonts.heading,
-    fontSize: 30,
     color: colors.darkBlue,
   },
-  bannerSub: {
-    fontFamily: fonts.body,
-    fontSize: 18,
-    color: colors.darkBlueText,
-    marginTop: 3,
+
+  /* ── Main content (no outer card) ── */
+  main: {
+    // No flex:1 — let content size naturally so question history below isn't pushed off-screen
   },
+
+  /* ── Great Job — plain text ── */
+  bannerTitle: { fontFamily: fonts.heading, color: colors.darkBlue },
+  bannerSub: { fontFamily: fonts.body, color: colors.darkBlueText },
 
   /* ── Scores row ── */
   scoresRow: {
     flexDirection: "row",
-    gap: 14,
-    marginBottom: 16,
-  },
-  gaugesRow: {
-    flex: 3,
-    flexDirection: "row",
-    gap: 12,
   },
   gaugeCard: {
     flex: 1,
-    borderWidth: 4,
-    borderRadius: 20,
-    padding: 12,
-    paddingTop: 14,
+    aspectRatio: 1,
     alignItems: "center",
+    justifyContent: "flex-start",
   },
-  gaugeLabel: {
-    fontFamily: fonts.heading,
-    fontSize: 17,
-    color: colors.darkBlue,
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  gaugeWrap: {
-    width: "100%",
-    aspectRatio: 2,
-    marginBottom: 8,
-  },
-  gaugeDesc: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.darkBlueText,
-    textAlign: "center",
-    lineHeight: 19,
-    marginTop: 2,
-  },
-  buildWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-  },
-  buildText: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 16,
-    color: colors.darkBlue,
-    textAlign: "center",
-  },
-  buildProg: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.textMuted,
-    marginTop: 6,
-  },
+  gaugeLabel: { fontFamily: fonts.heading, color: colors.darkBlue, textAlign: "center" },
+  gaugeWrap: { width: "92%", aspectRatio: 2 },
+  gaugePct: { fontFamily: fonts.heading, color: colors.darkBlue, textAlign: "center", marginTop: 4 },
+  gaugeDesc: { fontFamily: fonts.body, color: colors.darkBlueText, textAlign: "center", lineHeight: 22 },
+  buildWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  buildText: { fontFamily: fonts.bodySemiBold, color: colors.darkBlue, textAlign: "center" },
+  buildProg: { fontFamily: fonts.body, color: colors.textMuted },
 
-  /* ── Right column (stars + continue) ── */
-  rightCol: {
-    flex: 1.1,
+  /* ── Stars card (pink) ── */
+  starsCard: {
+    flex: 1,
+    aspectRatio: 1,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
+    justifyContent: "flex-start",
   },
-  earnedLabel: {
-    fontFamily: fonts.heading,
-    fontSize: 19,
-    color: colors.darkBlue,
-    marginBottom: 6,
-  },
-  starCount: {
-    fontFamily: fonts.heading,
-    fontSize: 34,
-    color: colors.darkBlue,
-    marginTop: 6,
-  },
-  starWord: {
-    fontFamily: fonts.body,
-    fontSize: 18,
-    color: colors.darkBlueText,
-  },
+  earnedLabel: { fontFamily: fonts.heading, color: colors.darkBlue, marginBottom: 8 },
+  starCount: { fontFamily: fonts.heading, color: colors.darkBlue },
+  starWord: { fontFamily: fonts.body, color: colors.darkBlueText },
   contBtn: {
     backgroundColor: colors.yellowCard,
-    borderWidth: 4,
-    borderColor: "#D4A017",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
+    borderColor: colors.yellowBorder,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
   },
-  contText: {
-    fontFamily: fonts.heading,
-    fontSize: 22,
-    color: colors.darkBlue,
-  },
-  contArrow: {
-    fontFamily: fonts.heading,
-    fontSize: 24,
-    color: colors.darkBlue,
-  },
+  contText: { fontFamily: fonts.heading, color: colors.darkBlue },
+  contArrow: { fontFamily: fonts.heading, color: colors.darkBlue },
 
-  /* ── Encouragement strip ── */
+  /* ── Encouragement (purple) ── */
   encCard: {
     backgroundColor: "#F3EEFF",
-    borderWidth: 4,
     borderColor: "#B89AFF",
-    borderRadius: 20,
-    padding: 16,
     flexDirection: "row",
     alignItems: "center",
   },
-  encTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 20,
-    color: colors.darkBlue,
+  encBulb: {
+    backgroundColor: "#B89AFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  encMsg: {
-    fontFamily: fonts.body,
-    fontSize: 16,
-    color: colors.darkBlueText,
-    marginTop: 3,
-    lineHeight: 22,
-  },
+  encTitle: { fontFamily: fonts.heading, color: colors.darkBlue },
+  encMsg: { fontFamily: fonts.body, color: colors.darkBlueText, lineHeight: 26 },
 
   /* ── Question History ── */
-  histTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 26,
-    color: colors.darkBlue,
-    marginBottom: 14,
-  },
+  histScroll: { flex: 1, marginTop: 8 },
+  histTitle: { fontFamily: fonts.heading, color: colors.darkBlue },
   histItem: {
     backgroundColor: colors.cardWhite,
-    borderRadius: 18,
-    borderWidth: 3,
     borderColor: "#e0e0e8",
-    padding: 18,
-    marginBottom: 12,
   },
-  histHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-  histQ: {
-    fontFamily: fonts.heading,
-    fontSize: 19,
-    color: colors.darkBlue,
-    flex: 1,
-  },
+  histHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
+  histQ: { fontFamily: fonts.heading, color: colors.darkBlue, flex: 1 },
   histLat: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 15,
-    color: colors.textMuted,
-    backgroundColor: "#f0f0f6",
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-    marginLeft: 10,
-    overflow: "hidden",
+    fontFamily: fonts.bodySemiBold, color: colors.textMuted,
+    backgroundColor: "#f0f0f6", paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 10, marginLeft: 10, overflow: "hidden",
   },
-  histDet: {
-    fontFamily: fonts.body,
-    fontSize: 17,
-    color: colors.darkBlueText,
-    lineHeight: 26,
-  },
+  histDet: { fontFamily: fonts.body, color: colors.darkBlueText, lineHeight: 28 },
   histFb: {
-    fontFamily: fonts.body,
-    fontStyle: "italic",
-    fontSize: 16,
-    color: colors.blueBorder,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#e8e8f0",
+    fontFamily: fonts.body, fontStyle: "italic", color: colors.blueBorder,
+    marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#e8e8f0",
   },
-  errorText: {
-    fontFamily: fonts.body,
-    fontSize: 18,
-    color: "#cc0000",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  retryBtn: {
-    backgroundColor: colors.darkBlueBtnBg,
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-  },
-  retryBtnText: {
-    fontFamily: fonts.heading,
-    fontSize: 20,
-    color: colors.white,
-  },
+  errorText: { fontFamily: fonts.body, fontSize: 20, color: "#cc0000", textAlign: "center", marginBottom: 20 },
+  retryBtn: { backgroundColor: colors.darkBlueBtnBg, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 40 },
+  retryBtnText: { fontFamily: fonts.heading, fontSize: 22, color: colors.white },
 });

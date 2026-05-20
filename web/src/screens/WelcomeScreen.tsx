@@ -7,6 +7,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Linking,
+  Platform,
+  Pressable,
+  useWindowDimensions,
 } from "react-native";
 import { colors, fonts } from "../theme";
 import ShapePattern from "../components/ShapePattern";
@@ -18,7 +21,10 @@ interface Props {
 }
 
 export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) {
+  const { width: winW, height: winH } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
+  const [beginPressed, setBeginPressed] = useState(false);
+  const [historyPressed, setHistoryPressed] = useState(false);
 
   const handlePress = async () => {
     setLoading(true);
@@ -31,50 +37,139 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
     }
   };
 
+  // Responsive scaling — same system as SummaryScreen
+  const pad           = Math.max(14, winW * 0.018);
+  const cardBorder    = Math.max(4, Math.min(6, winH * 0.007));
+  const cardRadius    = Math.max(20, winH * 0.03);
+
+  const logoH         = Math.max(80, Math.min(140, winH * 0.16));
+  const logoW         = logoH * 2.4;
+
+  const titleSz       = Math.max(28, Math.min(46, winH * 0.058));
+  const descSz        = Math.max(16, Math.min(22, winH * 0.026));
+  const btnFontSz     = Math.max(20, Math.min(30, winH * 0.036));
+  const hintSz        = Math.max(13, Math.min(16, winH * 0.02));
+
+  const beginWebStyle = Platform.OS === "web" ? ({
+    transition: "transform 150ms ease, box-shadow 150ms ease",
+    boxShadow: beginPressed ? `0px 0px 0px ${colors.yellowBorder}` : `0px ${cardBorder}px 0px ${colors.yellowBorder}`,
+    transform: beginPressed ? `translateY(${cardBorder}px)` : "translateY(0px)",
+  } as any) : undefined;
+
+  const historyWebStyle = Platform.OS === "web" ? ({
+    transition: "transform 150ms ease, box-shadow 150ms ease",
+    boxShadow: historyPressed ? `0px 0px 0px ${colors.blueBorder}` : `0px ${cardBorder}px 0px ${colors.blueBorder}`,
+    transform: historyPressed ? `translateY(${cardBorder}px)` : "translateY(0px)",
+  } as any) : undefined;
+
   return (
     <View style={styles.container}>
       <ShapePattern />
+
       {onSignOut && (
         <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={[styles.signOutText, { fontSize: hintSz }]}>Sign Out</Text>
         </TouchableOpacity>
       )}
-      <View style={styles.card}>
+
+      <View style={[styles.contentWrap, { padding: pad }]}>
         <Image
-          source={require("../../assets/adiologo2.png")}
-          style={styles.logo}
+          source={require("../../assets/adiologo.png")}
+          style={{ width: logoW, height: logoH, marginBottom: pad * 1.2 }}
           resizeMode="contain"
         />
-        <Text style={styles.title}>Reading Comprehension Therapy</Text>
-        <Text style={styles.description}>
+
+        <Text style={[styles.title, { fontSize: titleSz, marginBottom: pad }]}>
+          Reading Comprehension Therapy
+        </Text>
+
+        <Text style={[styles.description, {
+          fontSize: descSz,
+          lineHeight: descSz * 1.5,
+          marginBottom: pad * 2,
+          maxWidth: 640,
+        }]}>
           You will be shown a picture and asked to describe what you see. Speak
           your answers out loud — a friendly guide will listen and help you
           notice more details.
         </Text>
-        <TouchableOpacity
-          style={styles.btn}
+
+        {/* ── Primary: Begin a Session (yellow chunky button) ── */}
+        <Pressable
           onPress={handlePress}
           disabled={loading}
-          activeOpacity={0.8}
+          onPressIn={() => setBeginPressed(true)}
+          onPressOut={() => setBeginPressed(false)}
+          style={{ marginBottom: pad }}
         >
-          {loading ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.btnText}>Begin a Session</Text>
-          )}
-        </TouchableOpacity>
-
-        {onHistory && (
-          <TouchableOpacity
-            style={styles.historyBtn}
-            onPress={onHistory}
-            activeOpacity={0.8}
+          <View
+            style={[
+              styles.beginBtn,
+              {
+                borderWidth: cardBorder,
+                borderRadius: cardRadius * 0.7,
+                paddingVertical: pad,
+                paddingHorizontal: pad * 3,
+              },
+              Platform.OS === "web"
+                ? { shadowOpacity: 0, elevation: 0 }
+                : {
+                    shadowColor: colors.yellowBorder,
+                    shadowOffset: { width: 0, height: cardBorder },
+                    shadowOpacity: 1,
+                    shadowRadius: 0,
+                    elevation: 4,
+                  },
+              beginWebStyle,
+            ]}
           >
-            <Text style={styles.historyBtnText}>View Past Sessions</Text>
-          </TouchableOpacity>
+            {loading ? (
+              <ActivityIndicator color={colors.darkBlue} />
+            ) : (
+              <Text style={[styles.beginBtnText, { fontSize: btnFontSz }]}>Begin a Session</Text>
+            )}
+          </View>
+        </Pressable>
+
+        {/* ── Secondary: View Past Sessions (blue chunky button) ── */}
+        {onHistory && (
+          <Pressable
+            onPress={onHistory}
+            onPressIn={() => setHistoryPressed(true)}
+            onPressOut={() => setHistoryPressed(false)}
+            style={{ marginBottom: pad }}
+          >
+            <View
+              style={[
+                styles.historyBtn,
+                {
+                  borderWidth: cardBorder,
+                  borderRadius: cardRadius * 0.7,
+                  paddingVertical: pad * 0.8,
+                  paddingHorizontal: pad * 2.4,
+                },
+                Platform.OS === "web"
+                  ? { shadowOpacity: 0, elevation: 0 }
+                  : {
+                      shadowColor: colors.blueBorder,
+                      shadowOffset: { width: 0, height: cardBorder },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                      elevation: 4,
+                    },
+                historyWebStyle,
+              ]}
+            >
+              <Text style={[styles.historyBtnText, { fontSize: btnFontSz * 0.75 }]}>
+                View Past Sessions
+              </Text>
+            </View>
+          </Pressable>
         )}
 
-        <Text style={styles.hint}>An image will be chosen for you.</Text>
+        <Text style={[styles.hint, { fontSize: hintSz, marginTop: pad * 0.4 }]}>
+          An image will be chosen for you.
+        </Text>
       </View>
 
       <TouchableOpacity
@@ -86,7 +181,9 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
         }
         activeOpacity={0.7}
       >
-        <Text style={styles.feedbackText}>Send Feedback / Report a Bug</Text>
+        <Text style={[styles.feedbackText, { fontSize: hintSz }]}>
+          Send Feedback / Report a Bug
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -98,7 +195,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
   },
   signOutBtn: {
     position: "absolute",
@@ -109,76 +205,60 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
     color: colors.textMuted,
   },
-  card: {
-    backgroundColor: colors.cardWhite,
-    borderRadius: 28,
-    padding: 40,
-    width: "100%",
-    maxWidth: 480,
+  contentWrap: {
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    justifyContent: "center",
+    width: "100%",
   },
-  logo: { height: 80, width: 200, marginBottom: 12 },
   title: {
     fontFamily: fonts.heading,
-    fontSize: 24,
     color: colors.darkBlue,
     textAlign: "center",
-    marginBottom: 20,
   },
   description: {
     fontFamily: fonts.body,
-    fontSize: 16,
-    color: colors.textMuted,
+    color: colors.darkBlueText,
     textAlign: "center",
-    lineHeight: 26,
-    marginBottom: 28,
   },
-  btn: {
-    backgroundColor: colors.darkBlueBtnBg,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    marginBottom: 12,
+
+  /* ── Primary yellow chunky button ── */
+  beginBtn: {
+    backgroundColor: colors.yellowCard,
+    borderColor: colors.yellowBorder,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btnText: {
+  beginBtnText: {
     fontFamily: fonts.heading,
-    fontSize: 22,
-    color: colors.white,
+    color: colors.darkBlue,
   },
+
+  /* ── Secondary blue chunky button ── */
   historyBtn: {
-    borderWidth: 2,
+    backgroundColor: colors.blueCard,
     borderColor: colors.blueBorder,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
-    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   historyBtnText: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 16,
-    color: colors.blueBorder,
+    fontFamily: fonts.heading,
+    color: colors.darkBlue,
   },
+
   hint: {
     fontFamily: fonts.body,
-    fontSize: 14,
     color: colors.textMuted,
   },
   feedbackBtn: {
-    marginTop: 20,
+    position: "absolute",
+    bottom: 20,
     paddingVertical: 10,
     paddingHorizontal: 20,
   },
   feedbackText: {
     fontFamily: fonts.body,
-    fontSize: 14,
     color: colors.textMuted,
     textDecorationLine: "underline",
   },

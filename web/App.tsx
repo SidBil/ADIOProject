@@ -14,6 +14,7 @@ import {
 import { Session, User } from "@supabase/supabase-js";
 
 import LoginScreen from "./src/screens/LoginScreen";
+import LandingScreen from "./src/screens/LandingScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import SessionScreen from "./src/screens/SessionScreen";
 import SummaryScreen from "./src/screens/SummaryScreen";
@@ -24,7 +25,7 @@ import { supabase } from "./src/lib/supabase";
 import { track } from "./src/lib/analytics";
 import { colors } from "./src/theme";
 
-type Screen = "welcome" | "session" | "summary" | "dashboard" | "onboarding";
+type Screen = "landing" | "welcome" | "session" | "summary" | "dashboard" | "onboarding";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -37,7 +38,7 @@ export default function App() {
 
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [screen, setScreen] = useState<Screen>("welcome");
+  const [screen, setScreen] = useState<Screen>("landing");
   const [session, setSession] = useState<any>(null);
 
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -122,6 +123,18 @@ export default function App() {
   }
 
   if (!user) {
+    if (screen === "landing") {
+      return (
+        <>
+          <StatusBar style="dark" />
+          <LandingScreen
+            onStartSession={() => setScreen("session")}
+            onSignUp={() => setScreen("session")}
+            onLogIn={() => setScreen("session")}
+          />
+        </>
+      );
+    }
     return (
       <>
         <StatusBar style="dark" />

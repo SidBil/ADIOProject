@@ -11,11 +11,15 @@ import {
   Pressable,
   useWindowDimensions,
 } from "react-native";
-import Svg, { Path, Circle, Line } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { getSummary, imageUrl } from "../api";
 import { supabase } from "../lib/supabase";
 import ShapePattern from "../components/ShapePattern";
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+const gaugeArcImg = require("../../assets/Untitled-6-01.png");
+const gaugeNeedleImg = require("../../assets/spinner.png");
 
 interface Props {
   sessionId: string;
@@ -25,68 +29,86 @@ interface Props {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Gauge Meter — semicircular speedometer with needle
+   Gauge Meter — PNG arc image + rotated PNG needle
+   Arc image: 300×150 (2:1).  Needle image: 172×46.
+   The needle's circle hub is at roughly (23, 23) from its top-left.
    ═══════════════════════════════════════════════════════════════ */
 
 function GaugeMeter({ value }: { value: number | null }) {
-  const W = 200;
-  const H = 120;
-  const cx = W / 2;
-  const cy = H - 12;
-  const r = 74;
-  const sw = 22;
   const v = value != null ? Math.max(0, Math.min(1, value)) : 0;
+  // 0% → 180° (points left), 50% → 90° (points up), 100% → 0° (points right)
+  // CSS rotate: positive = clockwise. Our needle PNG points right at 0°.
+  // So at v=0: rotate 180°. At v=1: rotate 0°.
+  const angleDeg = 180 - v * 180;
 
-  const pt = (a: number) => ({
-    x: cx + r * Math.cos(a),
-    y: cy - r * Math.sin(a),
-  });
-
-  const arc = (a1: number, a2: number) => {
-    const p1 = pt(a1);
-    const p2 = pt(a2);
-    return `M ${p1.x} ${p1.y} A ${r} ${r} 0 0 1 ${p2.x} ${p2.y}`;
-  };
-
-  // 11px along radius 74 is 11/74 = 0.149 radians (~8.5 degrees).
-  // To have a nice gap of ~0.08 rad (4.5 degrees) between segments, we pull the path angles back by 0.19 rad (~11 degrees).
-  const gap = 0.19;
-  const segs = [
-    { from: Math.PI - 0.08, to: (2 * Math.PI) / 3 + gap, color: "#FF7D90" }, // Smooth pink/red
-    { from: (2 * Math.PI) / 3 - gap, to: Math.PI / 3 + gap, color: "#FCD34D" }, // Smooth yellow
-    { from: Math.PI / 3 - gap, to: 0.08, color: "#97D26E" }, // Smooth green
-  ];
-
-  const na = Math.PI * (1 - v);
-  const nl = r * 0.76;
-  const tip = { x: cx + nl * Math.cos(na), y: cy - nl * Math.sin(na) };
+  // The needle image is 172×46. The circle hub center is at ~(23, 23).
+  // We render the needle at a size proportional to the gauge.
+  // Needle display width = 55% of gauge width gives a good visual.
+  // Needle display height = (46/172) * needleWidth.
+  // The hub center as fraction: x=23/172 ≈ 13.4%, y=23/46 = 50%.
 
   return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}>
-      {segs.map((s, i) => (
-        <Path
-          key={i}
-          d={arc(s.from, s.to)}
-          stroke={s.color}
-          strokeWidth={sw}
-          fill="none"
-          strokeLinecap="round"
+    <View style={gS.wrap}>
+      {/* Arc background */}
+      <Image source={gaugeArcImg} style={gS.arc} resizeMode="contain" />
+
+      {/* Needle — absolutely positioned so hub sits at arc center-bottom */}
+      <View
+        style={[
+          gS.needleContainer,
+          {
+            transform: [{ rotate: `${angleDeg}deg` }],
+          } as any,
+          Platform.OS === "web"
+            ? ({ transformOrigin: "13.4% 50%" } as any)
+            : {},
+        ]}
+      >
+        <Image
+          source={gaugeNeedleImg}
+          style={gS.needleImg}
+          resizeMode="contain"
         />
-      ))}
-      <Line
-        x1={cx}
-        y1={cy}
-        x2={tip.x}
-        y2={tip.y}
-        stroke="#0B2265"
-        strokeWidth={7}
-        strokeLinecap="round"
-      />
-      <Circle cx={cx} cy={cy} r={9} fill="#0B2265" />
-      <Circle cx={cx} cy={cy} r={3.5} fill="#fff" />
-    </Svg>
+      </View>
+    </View>
   );
 }
+
+const NEEDLE_W_PCT = 55; // % of gauge width
+const NEEDLE_ASPECT = 46 / 172; // height/width of the needle image
+const HUB_X_FRAC = 23 / 172; // hub center x as fraction of needle width
+
+const gS = StyleSheet.create({
+  wrap: {
+    width: "100%",
+    aspectRatio: 2,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  arc: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+  },
+  needleContainer: {
+    position: "absolute",
+    // Position so the hub center aligns with arc center-bottom.
+    // The hub is at 13.4% of needle width from left.
+    // So we shift left by (50% - 13.4% * NEEDLE_W_PCT%).
+    // needleContainer.left = 50% - hubOffsetPx. We approximate:
+    bottom: -2,
+    left: `${50 - HUB_X_FRAC * NEEDLE_W_PCT}%` as any,
+    width: `${NEEDLE_W_PCT}%` as any,
+    aspectRatio: 172 / 46,
+  },
+  needleImg: {
+    width: "100%",
+    height: "100%",
+  },
+});
 
 /* ═══════════════════════════════════════════════════════════════
    Star SVG
@@ -107,6 +129,62 @@ function StarIcon({ size = 50 }: { size?: number }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Dynamic message helpers
+   ═══════════════════════════════════════════════════════════════ */
+
+function gaugeMessage(
+  kind: "understanding" | "observation" | "engagement",
+  v: number | null
+): string {
+  if (v == null) return "";
+  const pct = Math.round(v * 100);
+  if (kind === "understanding") {
+    if (pct >= 80) return "You understood most of what you saw!";
+    if (pct >= 50) return "You're getting there — keep describing!";
+    return "Let's keep practicing together!";
+  }
+  if (kind === "observation") {
+    if (pct >= 80) return "You noticed lots of great details!";
+    if (pct >= 50) return "Good eye! Try spotting even more next time.";
+    return "Look closely — there's so much to find!";
+  }
+  // engagement
+  if (pct >= 80) return "You stayed focused and did an awesome job!";
+  if (pct >= 50) return "Nice focus! Let's keep it going.";
+  return "Try to stay focused a little longer next time!";
+}
+
+function bannerMessage(answered: number, total: number): string {
+  if (answered >= total && total > 0)
+    return "You explored the scene and answered all the questions.";
+  if (answered > 0)
+    return `You explored the scene and answered ${answered} question${answered !== 1 ? "s" : ""}.`;
+  return "You explored the scene and answered 0 questions.";
+}
+
+function encouragement(avg: number | null): {
+  title: string;
+  message: string;
+} {
+  if (avg != null && avg >= 0.8)
+    return {
+      title: "Amazing work!",
+      message:
+        "You're really getting the hang of describing what you see!",
+    };
+  if (avg != null && avg >= 0.5)
+    return {
+      title: "Keep it up!",
+      message:
+        "The more you practice, the better you'll become at spotting details!",
+    };
+  return {
+    title: "Great effort!",
+    message: "Every session helps you get better. Keep practicing!",
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Main Summary Screen
    ═══════════════════════════════════════════════════════════════ */
 
@@ -116,7 +194,7 @@ export default function SummaryScreen({
   userId,
   onNewSession,
 }: Props) {
-  const { width: winW, height: winH } = useWindowDimensions();
+  const { width: winW } = useWindowDimensions();
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const saved = useRef(false);
@@ -161,9 +239,11 @@ export default function SummaryScreen({
       .catch((e) => setError(e.message));
   }, [sessionId]);
 
+  /* ── Loading / Error states ── */
+
   if (error) {
     return (
-      <View style={s.container}>
+      <View style={s.center}>
         <ShapePattern />
         <Text style={s.errorText}>Could not load summary: {error}</Text>
         <TouchableOpacity style={s.retryBtn} onPress={onNewSession}>
@@ -174,12 +254,14 @@ export default function SummaryScreen({
   }
   if (!data) {
     return (
-      <View style={s.container}>
+      <View style={s.center}>
         <ShapePattern />
         <ActivityIndicator size="large" color={colors.darkBlue} />
       </View>
     );
   }
+
+  /* ── Derived data ── */
 
   const progress = data.progress || {};
   const history: any[] = data.qa_history || [];
@@ -200,549 +282,522 @@ export default function SummaryScreen({
     scores.observation != null && scores.understanding != null
       ? (scores.observation + scores.understanding) / 2
       : null;
-  const encTitle =
-    avg != null && avg >= 0.8
-      ? "Amazing work!"
-      : avg != null && avg >= 0.5
-      ? "Keep it up!"
-      : "Great effort!";
-  const encMsg =
-    avg != null && avg >= 0.8
-      ? "You're really getting the hang of describing what you see!"
-      : avg != null && avg >= 0.5
-      ? "The more you practice, the better you'll become at spotting details!"
-      : "Every session helps you get better. Keep practicing!";
+  const enc = encouragement(avg);
 
   const contWebStyle =
     Platform.OS === "web"
       ? ({
           transition:
-            "transform 150ms cubic-bezier(0.445,0.05,0.55,0.95), box-shadow 150ms cubic-bezier(0.445,0.05,0.55,0.95)",
+            "transform 150ms ease, box-shadow 150ms ease",
           boxShadow: contPressed
-            ? "0px 0px 0px #E5B60D"
-            : "0px 5px 0px #E5B60D",
+            ? "0px 0px 0px #D4A017"
+            : "0px 5px 0px #D4A017",
           transform: contPressed ? "translateY(5px)" : "translateY(0px)",
         } as any)
       : undefined;
 
+  const maxW = Math.min(winW - 32, 750);
+
+  /* ── Render ── */
+
   return (
-    <View style={s.container}>
+    <View style={s.root}>
       <ShapePattern burst={burstCount} />
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={s.scrollContent}
+        contentContainerStyle={s.scrollInner}
         showsVerticalScrollIndicator={false}
       >
-        {/* ════════════  OUTER PINK CARD  ════════════ */}
-        {/* ════════════  OUTER PINK CARD  ════════════ */}
-        <View
-          style={[
-            s.outerCard,
-            Platform.OS === "web"
-              ? ({ boxShadow: `0px 10px 0px #FFA8BE` } as any)
-              : {
-                  shadowColor: "#FFA8BE",
-                  shadowOffset: { width: 0, height: 10 },
-                  shadowOpacity: 1,
-                  shadowRadius: 0,
-                },
-          ]}
-        >
-          {/* ── Great Job Banner ── */}
+        <View style={{ width: maxW, alignSelf: "center" }}>
+
+          {/* ═══════  OUTER PINK CARD  ═══════ */}
           <View
             style={[
-              s.bannerCard,
+              s.outerCard,
               Platform.OS === "web"
-                ? ({ boxShadow: `0px 6px 0px #FF6B8B` } as any)
+                ? ({ boxShadow: "0px 8px 0px #FFA8BE" } as any)
                 : {
-                    shadowColor: "#FF6B8B",
-                    shadowOffset: { width: 0, height: 6 },
+                    shadowColor: "#FFA8BE",
+                    shadowOffset: { width: 0, height: 8 },
                     shadowOpacity: 1,
                     shadowRadius: 0,
                   },
             ]}
           >
-            <StarIcon size={38} />
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={s.bannerTitle}>Great job!</Text>
-              <Text style={s.bannerSub}>
-                You explored the scene and answered all the questions.
-              </Text>
-            </View>
-          </View>
-
-          {/* ── Scores Grid (4 side-by-side 3D cards) ── */}
-          <View style={s.gridRow}>
-            {/* 1. Understanding */}
+            {/* ── Great job banner ── */}
             <View
               style={[
-                s.gaugeCard,
-                {
-                  backgroundColor: "#FFFDEB",
-                  borderColor: "#FDE047",
-                },
+                s.banner,
                 Platform.OS === "web"
-                  ? ({
-                      boxShadow: `0px 6px 0px #E5C50F`,
-                    } as any)
+                  ? ({ boxShadow: "0px 5px 0px #B5CC26" } as any)
                   : {
-                      shadowColor: "#E5C50F",
-                      shadowOffset: { width: 0, height: 6 },
+                      shadowColor: "#B5CC26",
+                      shadowOffset: { width: 0, height: 5 },
                       shadowOpacity: 1,
                       shadowRadius: 0,
                     },
               ]}
             >
-              <Text style={s.gaugeLabel}>Understanding</Text>
-              <View style={s.gaugeWrap}>
-                <GaugeMeter value={scores.understanding} />
+              <StarIcon size={42} />
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={s.bannerTitle}>Great job!</Text>
+                <Text style={s.bannerSub}>
+                  {bannerMessage(answered, total)}
+                </Text>
               </View>
-              <Text style={s.gaugePct}>
-                {scores.understanding != null
-                  ? `${Math.round(scores.understanding * 100)}%`
-                  : "—"}
-              </Text>
-              <Text style={s.gaugeDesc}>
-                You understood most of what you saw!
-              </Text>
             </View>
 
-            {/* 2. Observation */}
-            <View
-              style={[
-                s.gaugeCard,
-                {
-                  backgroundColor: "#F2F9EC",
-                  borderColor: "#A2D682",
-                },
-                Platform.OS === "web"
-                  ? ({
-                      boxShadow: `0px 6px 0px #86B867`,
-                    } as any)
-                  : {
-                      shadowColor: "#86B867",
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                    },
-              ]}
-            >
-              <Text style={s.gaugeLabel}>Observation</Text>
-              <View style={s.gaugeWrap}>
-                <GaugeMeter value={scores.observation} />
-              </View>
-              <Text style={s.gaugePct}>
-                {scores.observation != null
-                  ? `${Math.round(scores.observation * 100)}%`
-                  : "—"}
-              </Text>
-              <Text style={s.gaugeDesc}>
-                You noticed lots of great details!
-              </Text>
-            </View>
-
-            {/* 3. Engagement */}
-            <View
-              style={[
-                s.gaugeCard,
-                {
-                  backgroundColor: "#EDF7FC",
-                  borderColor: "#84CBEF",
-                },
-                Platform.OS === "web"
-                  ? ({
-                      boxShadow: `0px 6px 0px #61B1DA`,
-                    } as any)
-                  : {
-                      shadowColor: "#61B1DA",
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                    },
-              ]}
-            >
-              <Text style={s.gaugeLabel}>Engagement</Text>
-              {engBuilding ? (
-                <View style={s.buildWrap}>
-                  <Text style={s.buildText}>Building baseline…</Text>
-                  <Text style={s.buildProg}>
-                    {sessToward} / {baseMin} sessions
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <View style={s.gaugeWrap}>
-                    <GaugeMeter value={scores.engagement} />
-                  </View>
-                  <Text style={s.gaugePct}>
-                    {Math.round((scores.engagement ?? 0) * 100)}%
-                  </Text>
-                  <Text style={s.gaugeDesc}>
-                    You stayed focused and did an awesome job!
-                  </Text>
-                </>
-              )}
-            </View>
-
-            {/* 4. You earned */}
-            <View
-              style={[
-                s.earnedCard,
-                {
-                  backgroundColor: "#FFF1F5",
-                  borderColor: "#FFA8BE",
-                },
-                Platform.OS === "web"
-                  ? ({
-                      boxShadow: `0px 6px 0px #E58A9F`,
-                    } as any)
-                  : {
-                      shadowColor: "#E58A9F",
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                    },
-              ]}
-            >
-              <Text style={s.gaugeLabel}>You earned</Text>
-              
-              <View style={{ marginVertical: 4 }}>
-                <StarIcon size={64} />
-              </View>
-
-              <Text style={s.starCount}>
-                {starsEarned} / {total}
-                <Text style={s.starWord}> stars</Text>
-              </Text>
-
-              <Pressable
-                onPress={() => {
-                  setBurstCount((n) => n + 1);
-                  onNewSession();
-                }}
-                onPressIn={() => setContPressed(true)}
-                onPressOut={() => setContPressed(false)}
-                style={{ width: "100%", marginTop: 8 }}
-              >
+            {/* ── Scores row: 3 gauges + stars column ── */}
+            <View style={s.scoresRow}>
+              {/* Gauge cards (3 side by side) */}
+              <View style={s.gaugesRow}>
+                {/* Understanding */}
                 <View
                   style={[
-                    s.contBtn,
+                    s.gaugeCard,
+                    {
+                      backgroundColor: colors.greenBtn,
+                      borderColor: colors.greenBorder,
+                    },
                     Platform.OS === "web"
-                      ? { shadowOpacity: 0, elevation: 0 }
+                      ? ({
+                          boxShadow: `0px 5px 0px ${colors.greenBorder}`,
+                        } as any)
                       : {
-                          shadowColor: "#E5B60D",
+                          shadowColor: colors.greenBorder,
                           shadowOffset: { width: 0, height: 5 },
                           shadowOpacity: 1,
                           shadowRadius: 0,
-                          elevation: 4,
                         },
-                    contWebStyle,
                   ]}
                 >
-                  <Text style={s.contText}>Continue</Text>
-                  <Text style={s.contArrow}>›</Text>
+                  <Text style={s.gaugeLabel}>Understanding</Text>
+                  <View style={s.gaugeWrap}>
+                    <GaugeMeter value={scores.understanding} />
+                  </View>
+                  <Text style={s.gaugeDesc}>
+                    {gaugeMessage("understanding", scores.understanding)}
+                  </Text>
                 </View>
-              </Pressable>
-            </View>
-          </View>
 
-          {/* ── Encouragement Card ── */}
-          <View
-            style={[
-              s.encCard,
-              Platform.OS === "web"
-                ? ({ boxShadow: "0px 5px 0px #C5B2FF" } as any)
-                : {
-                    shadowColor: "#C5B2FF",
-                    shadowOffset: { width: 0, height: 5 },
-                    shadowOpacity: 1,
-                    shadowRadius: 0,
-                  },
-            ]}
-          >
-            <Text style={{ fontSize: 24 }}>💡</Text>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.encTitle}>{encTitle}</Text>
-              <Text style={s.encMsg}>{encMsg}</Text>
-            </View>
-          </View>
-        </View>
+                {/* Observation */}
+                <View
+                  style={[
+                    s.gaugeCard,
+                    {
+                      backgroundColor: colors.pinkCard,
+                      borderColor: colors.pinkBorder,
+                    },
+                    Platform.OS === "web"
+                      ? ({
+                          boxShadow: `0px 5px 0px ${colors.pinkBorder}`,
+                        } as any)
+                      : {
+                          shadowColor: colors.pinkBorder,
+                          shadowOffset: { width: 0, height: 5 },
+                          shadowOpacity: 1,
+                          shadowRadius: 0,
+                        },
+                  ]}
+                >
+                  <Text style={s.gaugeLabel}>Observation</Text>
+                  <View style={s.gaugeWrap}>
+                    <GaugeMeter value={scores.observation} />
+                  </View>
+                  <Text style={s.gaugeDesc}>
+                    {gaugeMessage("observation", scores.observation)}
+                  </Text>
+                </View>
 
-        {/* ════════════  QUESTION HISTORY (below outer card)  ════════════ */}
-        <Text style={s.histTitle}>Question History</Text>
-        {history.map((item: any, idx: number) => {
-          const fb = item.followup || item.evaluation?.feedback || "";
-          const lat = item.initiation_latency_ms;
-          return (
-            <View key={idx} style={s.histItem}>
-              <View style={s.histHead}>
-                <Text style={s.histQ}>{item.question}</Text>
-                {lat != null && (
-                  <Text style={s.histLat}>{(lat / 1000).toFixed(1)}s</Text>
-                )}
+                {/* Engagement */}
+                <View
+                  style={[
+                    s.gaugeCard,
+                    {
+                      backgroundColor: colors.blueCard,
+                      borderColor: colors.blueBorder,
+                    },
+                    Platform.OS === "web"
+                      ? ({
+                          boxShadow: `0px 5px 0px ${colors.blueBorder}`,
+                        } as any)
+                      : {
+                          shadowColor: colors.blueBorder,
+                          shadowOffset: { width: 0, height: 5 },
+                          shadowOpacity: 1,
+                          shadowRadius: 0,
+                        },
+                  ]}
+                >
+                  <Text style={s.gaugeLabel}>Engagement</Text>
+                  {engBuilding ? (
+                    <View style={s.buildWrap}>
+                      <Text style={s.buildText}>Building baseline…</Text>
+                      <Text style={s.buildProg}>
+                        {sessToward} / {baseMin} sessions
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={s.gaugeWrap}>
+                        <GaugeMeter value={scores.engagement} />
+                      </View>
+                      <Text style={s.gaugeDesc}>
+                        {gaugeMessage("engagement", scores.engagement)}
+                      </Text>
+                    </>
+                  )}
+                </View>
               </View>
-              <Text style={s.histDet}>
-                <Text style={{ fontWeight: "700" }}>Expected: </Text>
-                {item.expected_answer || "—"}
-              </Text>
-              <Text style={s.histDet}>
-                <Text style={{ fontWeight: "700" }}>You said: </Text>
-                {item.transcription || "—"}
-              </Text>
-              {fb ? <Text style={s.histFb}>"{fb}"</Text> : null}
+
+              {/* Stars + Continue column */}
+              <View style={s.rightCol}>
+                <Text style={s.earnedLabel}>You earned</Text>
+                <StarIcon size={80} />
+                <Text style={s.starCount}>
+                  {starsEarned} / {total}
+                </Text>
+                <Text style={s.starWord}>stars</Text>
+
+                <Pressable
+                  onPress={() => {
+                    setBurstCount((n) => n + 1);
+                    onNewSession();
+                  }}
+                  onPressIn={() => setContPressed(true)}
+                  onPressOut={() => setContPressed(false)}
+                  style={{ marginTop: 14, width: "100%" }}
+                >
+                  <View
+                    style={[
+                      s.contBtn,
+                      Platform.OS === "web"
+                        ? { shadowOpacity: 0, elevation: 0 }
+                        : {
+                            shadowColor: "#D4A017",
+                            shadowOffset: { width: 0, height: 5 },
+                            shadowOpacity: 1,
+                            shadowRadius: 0,
+                            elevation: 4,
+                          },
+                      contWebStyle,
+                    ]}
+                  >
+                    <Text style={s.contText}>Continue</Text>
+                    <Text style={s.contArrow}>›</Text>
+                  </View>
+                </Pressable>
+              </View>
             </View>
-          );
-        })}
-        <View style={{ height: 40 }} />
+
+            {/* ── Encouragement strip ── */}
+            <View
+              style={[
+                s.encCard,
+                Platform.OS === "web"
+                  ? ({ boxShadow: "0px 5px 0px #C5B2FF" } as any)
+                  : {
+                      shadowColor: "#C5B2FF",
+                      shadowOffset: { width: 0, height: 5 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    },
+              ]}
+            >
+              <Text style={{ fontSize: 28 }}>💡</Text>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={s.encTitle}>{enc.title}</Text>
+                <Text style={s.encMsg}>{enc.message}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ═══════  QUESTION HISTORY  ═══════ */}
+          <Text style={s.histTitle}>Question History</Text>
+          {history.map((item: any, idx: number) => {
+            const fb = item.followup || item.evaluation?.feedback || "";
+            const lat = item.initiation_latency_ms;
+            return (
+              <View key={idx} style={s.histItem}>
+                <View style={s.histHead}>
+                  <Text style={s.histQ}>{item.question}</Text>
+                  {lat != null && (
+                    <Text style={s.histLat}>
+                      {(lat / 1000).toFixed(1)}s
+                    </Text>
+                  )}
+                </View>
+                <Text style={s.histDet}>
+                  <Text style={{ fontWeight: "700" }}>Expected: </Text>
+                  {item.expected_answer || "—"}
+                </Text>
+                <Text style={s.histDet}>
+                  <Text style={{ fontWeight: "700" }}>You said: </Text>
+                  {item.transcription || "—"}
+                </Text>
+                {fb ? <Text style={s.histFb}>"{fb}"</Text> : null}
+              </View>
+            );
+          })}
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Styles
+   Styles  —  ALL text scaled up for readability
    ═══════════════════════════════════════════════════════════════ */
 
 const s = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: colors.bg,
   },
+  center: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scroll: { flex: 1 },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 24,
+  scrollInner: {
+    padding: 20,
+    paddingTop: 28,
   },
 
-  /* Outer pink card */
+  /* ── Outer pink card ── */
   outerCard: {
     backgroundColor: "#FFF5F7",
     borderWidth: 5,
     borderColor: "#FFA8BE",
     borderRadius: 28,
-    padding: 20,
-    marginBottom: 24,
+    padding: 18,
+    marginBottom: 28,
   },
 
-  /* Great Job Banner */
-  bannerCard: {
-    backgroundColor: "#FFE6EC",
+  /* ── Great Job banner ── */
+  banner: {
+    backgroundColor: colors.greenBtn,
     borderWidth: 4,
-    borderColor: "#FF6B8B",
+    borderColor: colors.greenBorder,
     borderRadius: 22,
-    padding: 16,
+    padding: 18,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 16,
   },
   bannerTitle: {
     fontFamily: fonts.heading,
-    fontSize: 26,
+    fontSize: 30,
     color: colors.darkBlue,
   },
   bannerSub: {
     fontFamily: fonts.body,
-    fontSize: 16,
+    fontSize: 18,
     color: colors.darkBlueText,
-    marginTop: 2,
+    marginTop: 3,
   },
 
-  /* Grid: 4 equal-width 3D cards */
-  gridRow: {
+  /* ── Scores row ── */
+  scoresRow: {
     flexDirection: "row",
-    gap: 16,
+    gap: 14,
     marginBottom: 16,
+  },
+  gaugesRow: {
+    flex: 3,
+    flexDirection: "row",
+    gap: 12,
   },
   gaugeCard: {
     flex: 1,
     borderWidth: 4,
-    borderRadius: 24,
-    padding: 14,
+    borderRadius: 20,
+    padding: 12,
+    paddingTop: 14,
     alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 255,
-  },
-  earnedCard: {
-    flex: 1.1,
-    borderWidth: 4,
-    borderRadius: 24,
-    padding: 14,
-    alignItems: "center",
-    justifyContent: "space-between",
-    minHeight: 255,
   },
   gaugeLabel: {
     fontFamily: fonts.heading,
-    fontSize: 16,
+    fontSize: 17,
     color: colors.darkBlue,
     textAlign: "center",
-    marginBottom: 2,
+    marginBottom: 6,
   },
   gaugeWrap: {
     width: "100%",
-    aspectRatio: 1.75,
-  },
-  gaugePct: {
-    fontFamily: fonts.heading,
-    fontSize: 30,
-    color: colors.darkBlue,
-    marginTop: -4,
+    aspectRatio: 2,
+    marginBottom: 8,
   },
   gaugeDesc: {
     fontFamily: fonts.body,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.darkBlueText,
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 19,
     marginTop: 2,
   },
   buildWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 18,
   },
   buildText: {
     fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.darkBlue,
     textAlign: "center",
   },
   buildProg: {
     fontFamily: fonts.body,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textMuted,
-    marginTop: 4,
+    marginTop: 6,
   },
 
-  /* You Earned details */
+  /* ── Right column (stars + continue) ── */
+  rightCol: {
+    flex: 1.1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  earnedLabel: {
+    fontFamily: fonts.heading,
+    fontSize: 19,
+    color: colors.darkBlue,
+    marginBottom: 6,
+  },
   starCount: {
     fontFamily: fonts.heading,
-    fontSize: 24,
+    fontSize: 34,
     color: colors.darkBlue,
-    textAlign: "center",
+    marginTop: 6,
   },
   starWord: {
     fontFamily: fonts.body,
-    fontSize: 16,
+    fontSize: 18,
     color: colors.darkBlueText,
   },
   contBtn: {
-    backgroundColor: "#FED915",
+    backgroundColor: colors.yellowCard,
     borderWidth: 4,
-    borderColor: "#E5B60D",
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    borderColor: "#D4A017",
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 6,
   },
   contText: {
     fontFamily: fonts.heading,
-    fontSize: 18,
+    fontSize: 22,
     color: colors.darkBlue,
   },
   contArrow: {
     fontFamily: fonts.heading,
-    fontSize: 20,
+    fontSize: 24,
     color: colors.darkBlue,
   },
 
-  /* Encouragement */
+  /* ── Encouragement strip ── */
   encCard: {
     backgroundColor: "#F3EEFF",
     borderWidth: 4,
     borderColor: "#B89AFF",
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
   },
   encTitle: {
     fontFamily: fonts.heading,
-    fontSize: 17,
+    fontSize: 20,
     color: colors.darkBlue,
   },
   encMsg: {
     fontFamily: fonts.body,
-    fontSize: 13,
+    fontSize: 16,
     color: colors.darkBlueText,
-    marginTop: 2,
-    lineHeight: 18,
+    marginTop: 3,
+    lineHeight: 22,
   },
 
-  /* Question History */
+  /* ── Question History ── */
   histTitle: {
     fontFamily: fonts.heading,
-    fontSize: 22,
+    fontSize: 26,
     color: colors.darkBlue,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   histItem: {
     backgroundColor: colors.cardWhite,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 3,
     borderColor: "#e0e0e8",
-    padding: 16,
-    marginBottom: 10,
+    padding: 18,
+    marginBottom: 12,
   },
   histHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   histQ: {
     fontFamily: fonts.heading,
-    fontSize: 16,
+    fontSize: 19,
     color: colors.darkBlue,
     flex: 1,
   },
   histLat: {
     fontFamily: fonts.bodySemiBold,
-    fontSize: 13,
+    fontSize: 15,
     color: colors.textMuted,
     backgroundColor: "#f0f0f6",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 10,
     overflow: "hidden",
   },
   histDet: {
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: 17,
     color: colors.darkBlueText,
-    lineHeight: 22,
+    lineHeight: 26,
   },
   histFb: {
     fontFamily: fonts.body,
     fontStyle: "italic",
-    fontSize: 14,
+    fontSize: 16,
     color: colors.blueBorder,
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "#e8e8f0",
   },
   errorText: {
     fontFamily: fonts.body,
-    fontSize: 16,
+    fontSize: 18,
     color: "#cc0000",
     textAlign: "center",
     marginBottom: 20,
   },
   retryBtn: {
     backgroundColor: colors.darkBlueBtnBg,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
   },
   retryBtnText: {
     fontFamily: fonts.heading,
-    fontSize: 18,
+    fontSize: 20,
     color: colors.white,
   },
 });

@@ -35,7 +35,7 @@ interface Props {
 
 function GaugeMeter({ value }: { value: number | null }) {
   const v = value != null ? Math.max(0, Math.min(1, value)) : 0;
-  const angleDeg = 180 - v * 180;
+  const angleDeg = v * 180 - 180;
   return (
     <View style={gS.wrap}>
       <Image source={gaugeArcImg} style={gS.arc} resizeMode="contain" />
@@ -211,9 +211,9 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
     ? winW - pad * 2
     : (winW - pad * 2 - cardGap * 3) / 4;
 
-  const gaugeLabelSz  = Math.min(Math.max(14, winH * 0.055), cardW * 0.18);
-  const gaugePctSz    = Math.min(Math.max(18, winH * 0.07), cardW * 0.22);
-  const gaugeDescSz   = Math.min(Math.max(11, winH * 0.022), cardW * 0.072);
+  const gaugeLabelSz  = Math.min(Math.max(13, winH * 0.04), cardW * 0.18);
+  const gaugePctSz    = Math.min(Math.max(15, winH * 0.055), cardW * 0.20);
+  const gaugeDescSz   = Math.min(Math.max(10, winH * 0.018), cardW * 0.075);
 
   const starIconSz    = Math.max(60, Math.min(110, winH * 0.14));
   const earnedSz      = Math.min(Math.max(14, winH * 0.055), cardW * 0.18);
@@ -234,16 +234,19 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
         showsVerticalScrollIndicator={false}
       >
 
-      {/* ════════  TOP BAR: logo + plain title text ════════ */}
+      {/* ════════  SUMMARY PAGE — exactly one screen tall ════════ */}
+      <View style={{ width: winW, height: winH }}>
+
+      {/* ── TOP BAR — pinned to top ── */}
       <View style={[s.topBar, { paddingHorizontal: pad, paddingTop: pad, paddingBottom: pad * 0.3 }]}>
         <Image source={adioLogo} style={{ width: logoW, height: logoH }} resizeMode="contain" />
         <Text style={[s.titleText, { fontSize: titleFontSz, marginLeft: pad * 1.2 }]}>Session Summary</Text>
       </View>
 
-      {/* ════════  MAIN CONTENT ════════ */}
-      <View style={[s.main, { paddingHorizontal: pad, paddingTop: pad * 1.5, gap: pad }]}>
+      {/* ════════  MAIN CONTENT — centered in remaining space ════════ */}
+      <View style={[s.main, { paddingHorizontal: pad, paddingBottom: pad, gap: pad * 1.5, flex: 1, justifyContent: "center" }]}>
 
-        {/* ── Great Job — plain left-aligned text, no card ── */}
+        {/* ── Great Job ── */}
         <View>
           <Text style={[s.bannerTitle, { fontSize: bannerTitleSz }]}>Great job!</Text>
           <Text style={[s.bannerSub, { fontSize: bannerSubSz, marginTop: 4 }]}>
@@ -251,111 +254,56 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
           </Text>
         </View>
 
-        {/* ── Scores row: 3 colored gauges + pink stars card ── */}
-        <View style={[s.scoresRow, { gap: cardGap, flexDirection: isMobile ? "column" : "row" }]}>
-
-          {/* Understanding — YELLOW */}
-          <GaugeCard
-            label="Understanding"
-            bg={colors.yellowCard}
-            border={colors.yellowBorder}
-            scores={scores}
-            scoreKey="understanding"
-            engBuilding={false}
-            sessToward={0}
-            baseMin={0}
-            cardBorder={cardBorder}
-            cardRadius={cardRadius}
-            labelSz={gaugeLabelSz}
-            pctSz={gaugePctSz}
-            descSz={gaugeDescSz}
-            pad={pad}
-            isMobile={isMobile}
-          />
-
-          {/* Observation — GREEN */}
-          <GaugeCard
-            label="Observation"
-            bg={colors.greenBtn}
-            border={colors.greenBorder}
-            scores={scores}
-            scoreKey="observation"
-            engBuilding={false}
-            sessToward={0}
-            baseMin={0}
-            cardBorder={cardBorder}
-            cardRadius={cardRadius}
-            labelSz={gaugeLabelSz}
-            pctSz={gaugePctSz}
-            descSz={gaugeDescSz}
-            pad={pad}
-            isMobile={isMobile}
-          />
-
-          {/* Engagement — BLUE */}
-          <GaugeCard
-            label="Engagement"
-            bg={colors.blueCard}
-            border={colors.blueBorder}
-            scores={scores}
-            scoreKey="engagement"
-            engBuilding={engBuilding}
-            sessToward={sessToward}
-            baseMin={baseMin}
-            cardBorder={cardBorder}
-            cardRadius={cardRadius}
-            labelSz={gaugeLabelSz}
-            pctSz={gaugePctSz}
-            descSz={gaugeDescSz}
-            pad={pad}
-            isMobile={isMobile}
-          />
-
-          {/* Stars + Continue — PINK */}
-          <View style={[s.starsCard, {
-            backgroundColor: colors.pinkCard,
-            borderColor: colors.pinkBorder,
-            borderWidth: cardBorder,
-            borderRadius: cardRadius,
-            paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
-            aspectRatio: isMobile ? undefined : 1,
-          },
-            Platform.OS === "web"
-              ? ({ boxShadow: `0px ${cardBorder}px 0px ${colors.pinkBorder}` } as any)
-              : { shadowColor: colors.pinkBorder, shadowOffset: { width: 0, height: cardBorder }, shadowOpacity: 1, shadowRadius: 0 },
-          ]}>
-            <Text style={[s.earnedLabel, { fontSize: earnedSz, marginBottom: pad * 0.4 }]}>You earned</Text>
-            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", width: "100%" }}>
-              <StarIcon size={starIconSz} />
-              <Text style={[s.starCount, { fontSize: starCountSz, marginTop: pad * 0.4 }]}>{starsEarned} / {total}</Text>
-              <Text style={[s.starWord, { fontSize: starWordSz }]}>stars</Text>
-            </View>
-
-            <Pressable
-              onPress={onNewSession}
-              onPressIn={() => setContPressed(true)}
-              onPressOut={() => setContPressed(false)}
-              style={{ marginTop: pad * 1.4, width: "100%" }}
-            >
-              <View style={[s.contBtn, {
-                borderWidth: cardBorder,
-                borderRadius: cardRadius * 0.6,
-                paddingVertical: pad * 0.7,
-                paddingHorizontal: pad,
-              },
-                Platform.OS === "web" ? { shadowOpacity: 0, elevation: 0 } : {
-                  shadowColor: colors.yellowBorder, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 1, shadowRadius: 0, elevation: 4,
-                },
-                contWebStyle,
-              ]}>
-                <Text style={[s.contText, { fontSize: contFontSz }]}>Continue</Text>
-              </View>
-            </Pressable>
-          </View>
+        {/* ── 3 Gauges — full width ── */}
+        <View style={{ flexDirection: isMobile ? "column" : "row", gap: cardGap, marginTop: pad * 1.5 }}>
+          <GaugeCard label="Understanding" scores={scores} scoreKey="understanding"
+            engBuilding={false} sessToward={0} baseMin={0}
+            labelSz={gaugeLabelSz} pctSz={gaugePctSz} descSz={gaugeDescSz} pad={pad} isMobile={isMobile} />
+          <GaugeCard label="Observation" scores={scores} scoreKey="observation"
+            engBuilding={false} sessToward={0} baseMin={0}
+            labelSz={gaugeLabelSz} pctSz={gaugePctSz} descSz={gaugeDescSz} pad={pad} isMobile={isMobile} />
+          <GaugeCard label="Engagement" scores={scores} scoreKey="engagement"
+            engBuilding={engBuilding} sessToward={sessToward} baseMin={baseMin}
+            labelSz={gaugeLabelSz} pctSz={gaugePctSz} descSz={gaugeDescSz} pad={pad} isMobile={isMobile} />
         </View>
+
+        {/* ── Stars + Continue — full width row ── */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: pad * 2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: pad * 0.6 }}>
+            <StarIcon size={starIconSz} />
+            <View>
+              <Text style={[s.starCount, { fontSize: starCountSz }]}>{starsEarned} / {total}</Text>
+              <Text style={[s.starWord, { fontSize: starWordSz }]}>stars earned</Text>
+            </View>
+          </View>
+
+          <Pressable
+            onPress={onNewSession}
+            onPressIn={() => setContPressed(true)}
+            onPressOut={() => setContPressed(false)}
+          >
+            <View style={[s.contBtn, {
+              borderWidth: cardBorder,
+              borderColor: colors.yellowBorder,
+              borderRadius: cardRadius * 0.6,
+              paddingVertical: pad * 0.7,
+              paddingHorizontal: pad * 2,
+              backgroundColor: colors.yellowCard,
+            },
+              Platform.OS === "web" ? contWebStyle : {
+                shadowColor: colors.yellowBorder, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 1, shadowRadius: 0, elevation: 4,
+              },
+            ]}>
+              <Text style={[s.contText, { fontSize: contFontSz }]}>Continue</Text>
+            </View>
+          </Pressable>
+        </View>
+
       </View>
 
-      {/* ════════  QUESTION HISTORY ════════ */}
+      </View>{/* end summary page */}
+
+      {/* ════════  QUESTION HISTORY — starts off-screen, scroll to reveal ════════ */}
       <View style={{ paddingHorizontal: pad, marginTop: pad }}>
         <Text style={[s.histTitle, { fontSize: bannerTitleSz * 0.7, marginBottom: pad }]}>Question History</Text>
         {history.map((item: any, idx: number) => {
@@ -388,36 +336,24 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
 
 function GaugeCard(props: {
   label: string;
-  bg: string;
-  border: string;
   scores: any;
   scoreKey: "understanding" | "observation" | "engagement";
   engBuilding: boolean;
   sessToward: number;
   baseMin: number;
-  cardBorder: number;
-  cardRadius: number;
   labelSz: number;
   pctSz: number;
   descSz: number;
   pad: number;
   isMobile?: boolean;
 }) {
-  const { label, bg, border, scores, scoreKey, engBuilding, sessToward, baseMin,
-          cardBorder, cardRadius, labelSz, pctSz, descSz, pad, isMobile } = props;
+  const { label, scores, scoreKey, engBuilding, sessToward, baseMin,
+          labelSz, pctSz, descSz, pad, isMobile } = props;
   const value = scores[scoreKey] as number | null | undefined;
 
   return (
-    <View style={[s.gaugeCard, {
-      backgroundColor: bg, borderColor: border, borderWidth: cardBorder, borderRadius: cardRadius,
-      paddingTop: pad * 0.9, paddingHorizontal: pad * 0.6, paddingBottom: pad * 0.6,
-      aspectRatio: isMobile ? undefined : 1,
-    },
-      Platform.OS === "web"
-        ? ({ boxShadow: `0px ${cardBorder}px 0px ${border}` } as any)
-        : { shadowColor: border, shadowOffset: { width: 0, height: cardBorder }, shadowOpacity: 1, shadowRadius: 0 },
-    ]}>
-      <Text style={[s.gaugeLabel, { fontSize: labelSz, marginBottom: pad * 0.4 }]}>{label}</Text>
+    <View style={[s.gaugeCard, { flex: 1, alignItems: "center", paddingHorizontal: pad * 0.4 }]}>
+      <Text style={[s.gaugeLabel, { fontSize: labelSz, marginBottom: pad * 0.2 }]}>{label}</Text>
 
       {engBuilding && scoreKey === "engagement" ? (
         <View style={s.buildWrap}>
@@ -425,16 +361,20 @@ function GaugeCard(props: {
           <Text style={[s.buildProg, { fontSize: descSz, marginTop: 8 }]}>{sessToward} / {baseMin} sessions</Text>
         </View>
       ) : (
-        <View style={{ flex: 1, width: "100%", alignItems: "center", justifyContent: "center" }}>
-          <View style={s.gaugeWrap}>
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <View style={{ width: "100%", aspectRatio: 2 }}>
             <GaugeMeter value={value ?? null} />
           </View>
-          <Text style={[s.gaugePct, { fontSize: pctSz, marginTop: pad * 0.2 }]}>
-            {value != null ? `${Math.round(value * 100)}%` : "—"}
-          </Text>
-          <Text style={[s.gaugeDesc, { fontSize: descSz, marginTop: pad * 0.3, paddingHorizontal: pad * 0.3 }]}>
-            {gaugeMessage(scoreKey, value ?? null)}
-          </Text>
+          {value != null && (
+            <>
+              <Text style={[s.gaugePct, { fontSize: pctSz, marginTop: pad * 0.1 }]}>
+                {Math.round(value * 100)}%
+              </Text>
+              <Text style={[s.gaugeDesc, { fontSize: descSz, marginTop: pad * 0.2, paddingHorizontal: pad * 0.3 }]}>
+                {gaugeMessage(scoreKey, value)}
+              </Text>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -477,9 +417,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
   },
-  gaugeLabel: { fontFamily: fonts.heading, color: colors.darkBlue, textAlign: "center" },
+  gaugeLabel: { fontFamily: fonts.bodySemiBold, color: colors.darkBlue, textAlign: "center" },
   gaugeWrap: { width: "92%", aspectRatio: 2 },
-  gaugePct: { fontFamily: fonts.heading, color: colors.darkBlue, textAlign: "center", marginTop: 4 },
+  gaugePct: { fontFamily: fonts.bodySemiBold, color: colors.darkBlue, textAlign: "center", marginTop: 4 },
   gaugeDesc: { fontFamily: fonts.body, color: colors.darkBlueText, textAlign: "center", lineHeight: 22 },
   buildWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   buildText: { fontFamily: fonts.bodySemiBold, color: colors.darkBlue, textAlign: "center" },

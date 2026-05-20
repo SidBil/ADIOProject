@@ -354,7 +354,7 @@ def _fetch_past_latencies(user_id: str, token: str) -> list[float]:
         f"?user_id=eq.{user_id}"
         f"&avg_latency_ms=not.is.null"
         f"&select=avg_latency_ms"
-        f"&order=created_at.desc"
+        f"&order=started_at.desc"
         f"&limit={ENGAGEMENT_BASELINE_N}"
     )
     req = urllib.request.Request(url, headers={

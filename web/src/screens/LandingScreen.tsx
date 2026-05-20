@@ -12,9 +12,9 @@ import { colors, fonts } from "../theme";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const adioLogo = require("../../assets/adiologo.png");
-const heroImg = require("../../assets/hero_child.png");
+const heroImg  = require("../../assets/hero_child.png");
 const privacyPdf = require("../constants/legal/Adio_Privacy_Policy.docx.pdf");
-const termsPdf = require("../constants/legal/Adio_Terms_and_Conditions.docx.pdf");
+const termsPdf   = require("../constants/legal/Adio_Terms_and_Conditions.docx.pdf");
 
 const getAssetUri = (source: any) => {
   if (typeof source === "string") return source;
@@ -27,82 +27,67 @@ interface Props {
   onLogIn: () => void;
 }
 
-// Breakpoints
-const BP_SM = 700;   // phone / very small tablet
-const BP_MD = 1000;  // mid-size laptop
-// > BP_MD → large desktop (original design)
+// Width breakpoints
+const BP_SM = 700;
+const BP_MD = 1000;
 
-export default function LandingScreen({
-  onStartSession,
-  onSignUp,
-  onLogIn,
-}: Props) {
+export default function LandingScreen({ onStartSession, onSignUp, onLogIn }: Props) {
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const isLarge  = winW > BP_MD;
-  const isMedium = winW > BP_SM && winW <= BP_MD;
+  const isLarge  = winW >  BP_MD;
+  const isMedium = winW >  BP_SM && winW <= BP_MD;
   const isSmall  = winW <= BP_SM;
 
-  // Scale helpers
-  const navFontSize     = isLarge ? 30   : isMedium ? 22  : 17;
-  const navGap          = isLarge ? 56   : isMedium ? 32  : 20;
-  const navPadH         = isLarge ? 64   : isMedium ? 40  : 20;
-  const navPadTop       = isLarge ? 48   : isMedium ? 32  : 20;
-  const navPadBottom    = isLarge ? 24   : isMedium ? 16  : 12;
+  // ── Scaled values ─────────────────────────────────────────────
+  const navFontSize  = isLarge ? 30  : isMedium ? 22  : 17;
+  const navGap       = isLarge ? 56  : isMedium ? 32  : 20;
+  const navPadH      = isLarge ? 64  : isMedium ? 40  : 20;
+  const navPadV      = isLarge ? 32  : isMedium ? 20  : 14;
 
-  const logoW           = isLarge ? 400  : isMedium ? 280 : 200;
-  const logoH           = isLarge ? 168  : isMedium ? 118 : 84;
+  const logoW        = isLarge ? 360 : isMedium ? 240 : 180;
+  const logoH        = isLarge ? 150 : isMedium ? 100 : 76;
 
-  const taglineFontSize = isLarge ? 64   : isMedium ? 44  : 32;
-  const taglineLineH    = isLarge ? 76   : isMedium ? 54  : 40;
-  const taglineMB       = isLarge ? 40   : isMedium ? 28  : 20;
+  const taglineSize  = isLarge ? 56  : isMedium ? 40  : 30;
+  const taglineLineH = isLarge ? 68  : isMedium ? 50  : 38;
+  const taglineMB    = isLarge ? 32  : isMedium ? 24  : 16;
 
-  const sectionFontSize = isLarge ? 30   : isMedium ? 22  : 18;
-  const bulletFontSize  = isLarge ? 22   : isMedium ? 16  : 14;
-  const bulletLineH     = isLarge ? 34   : isMedium ? 26  : 22;
-  const bulletGap       = isLarge ? 14   : isMedium ? 10  : 8;
-  const bulletDotSize   = isLarge ? 24   : isMedium ? 18  : 15;
+  const sectionSize  = isLarge ? 26  : isMedium ? 20  : 17;
+  const bulletSize   = isLarge ? 19  : isMedium ? 15  : 13;
+  const bulletLineH  = isLarge ? 30  : isMedium ? 24  : 20;
+  const bulletGap    = isLarge ? 12  : isMedium ? 9   : 7;
+  const bulletDotSz  = isLarge ? 20  : isMedium ? 16  : 13;
 
-  const colsGap         = isLarge ? 64   : isMedium ? 36  : 24;
-  const mainPadLeft     = isLarge ? 64   : isMedium ? 40  : 20;
-  const leftPadRight    = isLarge ? 48   : isMedium ? 24  : 16;
+  const colsGap      = isLarge ? 56  : isMedium ? 32  : 20;
+  const mainPadL     = isLarge ? 64  : isMedium ? 40  : 20;
+  const leftPadR     = isLarge ? 40  : isMedium ? 20  : 16;
+  const contentPadT  = isLarge ? 32  : isMedium ? 24  : 20;
+  const contentPadB  = isLarge ? 40  : isMedium ? 32  : 28;
 
-  const footerFontSize  = isLarge ? 18   : isMedium ? 14  : 12;
-  const footerMT        = isLarge ? 48   : isMedium ? 28  : 20;
+  const footerSize   = isLarge ? 15  : isMedium ? 13  : 11;
+  const footerMT     = isLarge ? 36  : isMedium ? 24  : 16;
 
-  // On small screens: stack vertically, hide hero; on medium+: side-by-side
-  const mainIsRow = !isSmall;
+  const showHero     = !isSmall;
+  const heroFlex     = isMedium ? 0.55 : 0.65;
 
-  // On small screens wrap in ScrollView so content isn't clipped
-  const ContentWrapper = isSmall ? ScrollView : View;
-  const contentWrapperProps = isSmall
-    ? { style: { flex: 1 }, contentContainerStyle: { flexGrow: 1 } }
-    : { style: { flex: 1, flexDirection: "row" as const, paddingLeft: mainPadLeft } };
+  // Hero needs an explicit height so it doesn't collapse in the scrollable container.
+  // Target ~85% of viewport height, clamped so it always looks good.
+  const heroHeight   = Math.max(400, winH * 0.85);
 
   return (
-    <View style={[styles.root, { width: winW, height: winH }]}>
-      {/* ═══════  TOP NAV  ═══════ */}
-      <View
-        style={[
-          styles.nav,
-          {
-            paddingTop: navPadTop,
-            paddingBottom: navPadBottom,
-            paddingHorizontal: navPadH,
-          },
-        ]}
-      >
-        <View style={[styles.navLeft, { gap: navGap }]}>
+    // Outer shell — fills the viewport, clips nothing upward
+    <View style={[styles.shell, { width: winW, height: winH }]}>
+
+      {/* ── NAV — always on top, never scrolls away ── */}
+      <View style={[styles.nav, { paddingHorizontal: navPadH, paddingVertical: navPadV }]}>
+        <View style={[styles.navRow, { gap: navGap }]}>
           <Pressable>
             <Text style={[styles.navLink, { fontSize: navFontSize }]}>Home</Text>
           </Pressable>
           <Pressable onPress={onStartSession}>
-            <Text style={[styles.navLink, { fontSize: navFontSize }]}>
-              Start a Session
-            </Text>
+            <Text style={[styles.navLink, { fontSize: navFontSize }]}>Start a Session</Text>
           </Pressable>
         </View>
-        <View style={[styles.navRight, { gap: navGap }]}>
+        <View style={[styles.navRow, { gap: navGap }]}>
           <Pressable onPress={onSignUp}>
             <Text style={[styles.navLink, { fontSize: navFontSize }]}>Sign Up</Text>
           </Pressable>
@@ -112,154 +97,138 @@ export default function LandingScreen({
         </View>
       </View>
 
-      {/* ═══════  MAIN CONTENT  ═══════ */}
-      <ContentWrapper {...contentWrapperProps}>
-        {/* Left / only column */}
+      {/* ── BODY — always scrollable so tall content never overflows into nav ── */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Inner row — flex: 1 so it fills the ScrollView height, enabling safe vertical centering */}
+        <View
+          style={[
+            styles.scrollContent,
+            {
+              flexDirection: showHero ? "row" : "column",
+              paddingLeft: mainPadL,
+            },
+          ]}
+        >
+        {/* Left / full-width column */}
         <View
           style={[
             styles.left,
             {
-              paddingRight: mainIsRow ? leftPadRight : mainPadLeft,
-              paddingLeft: isSmall ? mainPadLeft : 0,
-              paddingBottom: isSmall ? 32 : 32,
+              paddingTop:    contentPadT,
+              paddingBottom: contentPadB,
+              paddingRight:  showHero ? leftPadR : mainPadL,
             },
           ]}
         >
           <Image
             source={adioLogo}
-            style={{ width: logoW, height: logoH, marginBottom: 16 }}
+            style={{ width: logoW, height: logoH, marginBottom: 14 }}
             resizeMode="contain"
           />
 
-          <Text
-            style={[
-              styles.tagline,
-              {
-                fontSize: taglineFontSize,
-                lineHeight: taglineLineH,
-                marginBottom: taglineMB,
-              },
-            ]}
-          >
+          <Text style={[styles.tagline, { fontSize: taglineSize, lineHeight: taglineLineH, marginBottom: taglineMB }]}>
             See it. Say it. Understand it.
           </Text>
 
           {/* Two content columns — stack on small */}
-          <View
-            style={[
-              styles.contentCols,
-              {
-                flexDirection: isSmall ? "column" : "row",
-                gap: colsGap,
-              },
-            ]}
-          >
+          <View style={[styles.contentCols, { flexDirection: isSmall ? "column" : "row", gap: colsGap }]}>
             <View style={styles.contentCol}>
-              <Text style={[styles.sectionTitle, { fontSize: sectionFontSize }]}>
-                What We Do
-              </Text>
+              <Text style={[styles.sectionTitle, { fontSize: sectionSize }]}>What We Do</Text>
               <View style={[styles.bulletList, { gap: bulletGap }]}>
-                <Bullet text="We help children turn words into clear mental images"          dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Students describe and refine what they see to strengthen understanding" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Our method boosts comprehension, memory, and language skills"  dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Lessons are calm, structured, and supportive"                  dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Light gamification motivates without distracting"              dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="We build confidence, independent thinking, and clear communication" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="We help children turn words into clear mental images"                    dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Students describe and refine what they see to strengthen understanding"  dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Our method boosts comprehension, memory, and language skills"            dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Lessons are calm, structured, and supportive"                           dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Light gamification motivates without distracting"                       dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="We build confidence, independent thinking, and clear communication"     dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
               </View>
             </View>
 
             <View style={styles.contentCol}>
-              <Text style={[styles.sectionTitle, { fontSize: sectionFontSize }]}>
-                How It Works
-              </Text>
+              <Text style={[styles.sectionTitle, { fontSize: sectionSize }]}>How It Works</Text>
               <View style={[styles.bulletList, { gap: bulletGap }]}>
-                <Bullet text="Your child signs in and starts a session"                     dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="They describe what they see using their voice"                 dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Our AI listens, evaluates, and asks follow-up questions"       dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="A summary shows progress in observation, understanding, and engagement" dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
-                <Bullet text="Every session is unique — no two are the same"                dotSize={bulletDotSize} textSize={bulletFontSize} lineH={bulletLineH} />
+                <Bullet text="Your child signs in and starts a session"                                       dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="They describe what they see using their voice"                                   dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Our AI listens, evaluates, and asks follow-up questions"                        dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="A summary shows progress in observation, understanding, and engagement"         dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
+                <Bullet text="Every session is unique — no two are the same"                                  dot={bulletDotSz} size={bulletSize} lineH={bulletLineH} />
               </View>
             </View>
           </View>
 
-          <View style={[styles.footer, { marginTop: footerMT }]}>
-            <Text style={[styles.footerText, { fontSize: footerFontSize }]}>
+          <View style={{ marginTop: footerMT }}>
+            <Text style={[styles.footerText, { fontSize: footerSize }]}>
               © 2026 Adio. All rights reserved.{"  "}•{"  "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => window.open(getAssetUri(termsPdf), "_blank")}
-              >
+              <Text style={styles.footerLink} onPress={() => window.open(getAssetUri(termsPdf), "_blank")}>
                 Terms & Conditions
               </Text>
               {"  "}•{"  "}
-              <Text
-                style={styles.footerLink}
-                onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}
-              >
+              <Text style={styles.footerLink} onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}>
                 Privacy Policy
               </Text>
             </Text>
           </View>
         </View>
 
-        {/* Right — hero image; hidden on small screens */}
-        {mainIsRow && (
-          <View style={[styles.right, { flex: isMedium ? 0.5 : 0.65 }]}>
-            <View style={styles.heroImageWrap}>
+        {/* Right — hero image, hidden on small screens */}
+        {showHero && (
+          <View style={[styles.heroCol, { flex: heroFlex }]}>
+            <View style={[styles.heroImageWrap, { height: heroHeight }]}>
               <Image source={heroImg} style={styles.heroImage} resizeMode="cover" />
             </View>
           </View>
         )}
-      </ContentWrapper>
+        </View>{/* end inner row */}
+      </ScrollView>
     </View>
   );
 }
 
-/* ── Bullet component ── */
+/* ── Bullet ──────────────────────────────────────────────────── */
 
-function Bullet({
-  text,
-  dotSize,
-  textSize,
-  lineH,
-}: {
-  text: string;
-  dotSize: number;
-  textSize: number;
-  lineH: number;
-}) {
+function Bullet({ text, dot, size, lineH }: { text: string; dot: number; size: number; lineH: number }) {
   return (
     <View style={styles.bulletRow}>
-      <Text style={[styles.bulletDot, { fontSize: dotSize, lineHeight: lineH }]}>•</Text>
-      <Text style={[styles.bulletText, { fontSize: textSize, lineHeight: lineH }]}>
-        {text}
-      </Text>
+      <Text style={[styles.bulletDot, { fontSize: dot, lineHeight: lineH }]}>•</Text>
+      <Text style={[styles.bulletText, { fontSize: size, lineHeight: lineH }]}>{text}</Text>
     </View>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Base styles (size-independent)
-   ═══════════════════════════════════════════════════════════════ */
+/* ── Styles ──────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
-  root: {
+  shell: {
     backgroundColor: colors.bg,
-    overflow: "hidden",
+    // No overflow:hidden — we want the ScrollView to own clipping
   },
 
+  // Nav sits outside the ScrollView so it never scrolls away
   nav: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    backgroundColor: colors.bg,
+    zIndex: 10,
   },
-  navLeft: { flexDirection: "row" },
-  navRight: { flexDirection: "row" },
+  navRow: { flexDirection: "row" },
   navLink: {
     fontFamily: fonts.heading,
     color: colors.darkBlue,
   },
 
+  scrollArea: { flex: 1 },
+  // flex: 1 lets this row fill the ScrollView height → safe to center within it
+  scrollContent: {
+    flex: 1,
+    alignItems: "stretch",
+  },
+
+  // Now safely centered — bounded by the ScrollView which sits below the nav
   left: {
     flex: 1,
     justifyContent: "center",
@@ -276,7 +245,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: fonts.heading,
     color: colors.darkBlue,
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   bulletList: {},
@@ -287,7 +256,7 @@ const styles = StyleSheet.create({
   bulletDot: {
     fontFamily: fonts.body,
     color: colors.darkBlue,
-    marginRight: 14,
+    marginRight: 12,
   },
   bulletText: {
     fontFamily: fonts.body,
@@ -295,11 +264,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  right: {
+  heroCol: {
     justifyContent: "flex-end",
   },
   heroImageWrap: {
-    flex: 1,
     borderTopLeftRadius: 999,
     borderTopRightRadius: 999,
     overflow: "hidden",
@@ -310,11 +278,10 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  footer: {},
   footerText: {
     fontFamily: fonts.body,
     color: colors.textMuted,
-    lineHeight: 26,
+    lineHeight: 22,
   },
   footerLink: {
     fontFamily: fonts.bodySemiBold,

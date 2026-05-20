@@ -254,6 +254,77 @@ class SessionManager:
     def get_session(self, session_id: str) -> Session | None:
         return self.sessions.get(session_id)
 
+    def recover_session(self, session_id: str, token: str) -> Session | None:
+        """Reconstruct a session from Supabase when it's missing from in-memory store.
+
+        This handles the case where a Vercel serverless instance was cold-started
+        and doesn't have the session in its local dict.
+        """
+        try:
+            from services.interaction_store import get_supabase_client
+            sb = get_supabase_client(token)
+
+            # 1. Look up the therapy_sessions row by app_session_id
+            ts = sb.table("therapy_sessions") \
+                   .select("id, image_id, image_filename") \
+                   .eq("app_session_id", session_id) \
+                   .maybe_single() \
+                   .execute()
+
+            if not ts.data:
+                return None
+
+            row = ts.data
+            image_filename = row.get("image_filename") or row.get("image_id")
+            if not image_filename or image_filename not in self.image_metadata:
+                return None
+
+            meta = self.image_metadata[image_filename]
+
+            # 2. Rebuild the base question list from metadata
+            all_questions = _build_questions(meta)
+
+            # 3. Load answered turns so we can replay state
+            turns_res = sb.table("therapy_turns") \
+                          .select("turn_index, question_text, transcription, llm_evaluation, llm_followup, initiation_latency_ms, structure_word") \
+                          .eq("session_id", row["id"]) \
+                          .order("turn_index") \
+                          .execute()
+
+            turns = turns_res.data or []
+            answered_count = len(turns)
+
+            for t in turns:
+                idx = t.get("turn_index", 0)
+                if idx < len(all_questions):
+                    q = all_questions[idx]
+                    q.transcription = t.get("transcription")
+                    q.evaluation = t.get("llm_evaluation")
+                    followup = t.get("llm_followup") or {}
+                    q.followup = followup.get("comment", "") if isinstance(followup, dict) else ""
+                    q.initiation_latency_ms = t.get("initiation_latency_ms")
+
+            # 4. Reconstruct session
+            session = Session(
+                session_id=session_id,
+                image_id=row.get("image_id", image_filename),
+                image_filename=image_filename,
+                metadata=meta,
+                questions=all_questions,
+                current_question_idx=answered_count,
+                internal_db_id=row["id"],
+            )
+            if answered_count >= len(all_questions):
+                session.completed = True
+
+            self.sessions[session_id] = session
+            print(f"[Session] Recovered session {session_id} from Supabase ({answered_count} turns answered)")
+            return session
+
+        except Exception as e:
+            print(f"[Session] Failed to recover session {session_id}: {e}")
+            return None
+
     def record_answer(self, session_id: str, transcription: str,
                       evaluation: dict, followup: dict | None = None,
                       initiation_latency_ms: float | None = None):

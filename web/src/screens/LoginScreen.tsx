@@ -162,14 +162,14 @@ export default function LoginScreen({ onAuth }: Props) {
               By signing up, you agree to our{" "}
               <Text
                 style={styles.legalLink}
-                onPress={() => window.open(getAssetUri(termsPdf), "_blank")}
+                onPress={() => Platform.OS === "web" && window.open(getAssetUri(termsPdf), "_blank")}
               >
                 Terms & Conditions
               </Text>
               {" and "}
               <Text
                 style={styles.legalLink}
-                onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}
+                onPress={() => Platform.OS === "web" && window.open(getAssetUri(privacyPdf), "_blank")}
               >
                 Privacy Policy
               </Text>

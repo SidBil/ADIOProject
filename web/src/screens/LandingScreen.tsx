@@ -163,11 +163,11 @@ export default function LandingScreen({ onStartSession, onSignUp, onLogIn }: Pro
           <View style={{ marginTop: footerMT }}>
             <Text style={[styles.footerText, { fontSize: footerSize }]}>
               © 2026 Adio. All rights reserved.{"  "}•{"  "}
-              <Text style={styles.footerLink} onPress={() => window.open(getAssetUri(termsPdf), "_blank")}>
+              <Text style={styles.footerLink} onPress={() => Platform.OS === "web" && window.open(getAssetUri(termsPdf), "_blank")}>
                 Terms & Conditions
               </Text>
               {"  "}•{"  "}
-              <Text style={styles.footerLink} onPress={() => window.open(getAssetUri(privacyPdf), "_blank")}>
+              <Text style={styles.footerLink} onPress={() => Platform.OS === "web" && window.open(getAssetUri(privacyPdf), "_blank")}>
                 Privacy Policy
               </Text>
             </Text>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useFonts } from "expo-font";
@@ -42,17 +42,22 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
 
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  // Track whether the initial auth check has already run so that subsequent
+  // token refreshes / user-update events don't navigate away from an active session.
+  const initialAuthDone = useRef(false);
 
   useEffect(() => {
-    const checkProfile = async (u: User) => {
+    const checkProfile = async (u: User, isInitial: boolean) => {
       try {
         const { data } = await supabase.from("user_profiles").select("id").eq("id", u.id).maybeSingle();
         if (data) {
           setHasProfile(true);
-          setScreen("welcome");
+          // Only navigate on the very first auth check — never interrupt an
+          // active session/summary screen due to a token refresh or user-update event.
+          if (isInitial) setScreen("welcome");
         } else {
           setHasProfile(false);
-          setScreen("onboarding");
+          if (isInitial) setScreen("onboarding");
         }
       } catch (e) {
         console.error("Profile check failed", e);
@@ -65,16 +70,28 @@ export default function App() {
       (_event, s: Session | null) => {
         const u = s?.user ?? null;
         setUser(u);
-        if (u) checkProfile(u);
-        else setAuthReady(true);
+        if (u) {
+          const isInitial = !initialAuthDone.current;
+          initialAuthDone.current = true;
+          checkProfile(u, isInitial);
+        } else {
+          // Signed out — always navigate back to login
+          initialAuthDone.current = false;
+          setAuthReady(true);
+        }
       }
     );
 
+    // Seed initial session state from storage (runs once on mount)
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       const u = s?.user ?? null;
       setUser(u);
-      if (u) checkProfile(u);
-      else setAuthReady(true);
+      if (u) {
+        initialAuthDone.current = true;
+        checkProfile(u, true);
+      } else {
+        setAuthReady(true);
+      }
     });
 
     return () => subscription.unsubscribe();

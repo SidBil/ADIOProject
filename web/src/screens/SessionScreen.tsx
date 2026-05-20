@@ -169,7 +169,12 @@ export default function SessionScreen({
           ? "audio/m4a"
           : "audio/mp4";
       const tData = await transcribeAudio(session.session_id, uri, mimeType);
-      const transcription = tData.transcription || tData.text;
+      const transcription = (tData.transcription || tData.text || "").trim();
+
+      if (!transcription) {
+        showAlert("Couldn't hear that", "We didn't catch anything. Please try speaking again.");
+        return;
+      }
 
       const eData = await evaluate(
         session.session_id,

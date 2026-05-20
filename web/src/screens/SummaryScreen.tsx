@@ -14,7 +14,6 @@ import {
 import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { getSummary } from "../api";
-import { supabase } from "../lib/supabase";
 import ShapePattern from "../components/ShapePattern";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -97,6 +96,7 @@ function gaugeMessage(kind: "understanding" | "observation" | "engagement", v: n
     if (pct >= 50) return "Good eye! Try spotting even more next time.";
     return "Look closely — there's so much to find!";
   }
+  // engagement
   if (pct >= 80) return "You stayed focused and did an awesome job!";
   if (pct >= 50) return "Nice focus! Let's keep it going.";
   return "Try to stay focused a little longer next time!";
@@ -129,27 +129,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
     getSummary(sessionId, userId)
       .then((d) => {
         setData(d);
-        if (!saved.current) {
-          saved.current = true;
-          const history = (d.qa_history || []).map((item: any) => ({
-            question: item.question, structure_word: item.structure_word,
-            expected_answer: item.expected_answer, transcription: item.transcription,
-            evaluation: item.evaluation, followup: item.followup,
-            initiation_latency_ms: item.initiation_latency_ms,
-          }));
-          const sc = d.scores || {};
-          supabase.from("sessions").insert({
-            user_id: userId, session_id: sessionId,
-            image_id: imageId || d.image_id || null,
-            questions_answered: d.progress?.answered ?? 0,
-            total_questions: d.progress?.total ?? 0,
-            qa_history: history,
-            avg_latency_ms: sc.avg_latency_ms ?? null,
-            observation_score: sc.observation ?? null,
-            understanding_score: sc.understanding ?? null,
-            engagement_score: sc.engagement ?? null,
-          }).then(({ error: err }) => { if (err) console.warn("Save failed:", err.message); });
-        }
+        // Session data is written by the backend to therapy_sessions.
+        // No duplicate client-side write needed.
       })
       .catch((e) => setError(e.message));
   }, [sessionId]);

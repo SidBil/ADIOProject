@@ -73,7 +73,8 @@ export async function evaluate(
 
 export async function endSession(sessionId: string) {
   const headers = await getAuthHeaders();
-  await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: "POST", headers });
+  const res = await fetch(`${API_BASE}/api/session/${sessionId}/end`, { method: "POST", headers });
+  if (!res.ok) console.warn(`endSession failed: ${res.status} ${await res.text().catch(() => "")}`);
 }
 
 export async function getSummary(sessionId: string, userId?: string) {

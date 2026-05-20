@@ -154,7 +154,7 @@ async def get_session(session_id: str):
 @app.post("/api/transcribe")
 async def transcribe(session_id: str, audio: UploadFile = File(...), token: str = Depends(get_token)):
     user_id = interaction_store.verify_token_and_get_user(token)
-    session = sessions.get_session(session_id)
+    session = sessions.get_session(session_id) or sessions.recover_session(session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
 
@@ -165,6 +165,9 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
         tmp.write(content)
         tmp_path = tmp.name
 
+    webm_path = tmp_path  # always clean up the original upload
+    wav_path = None       # only set if we do a local conversion
+
     audio_path = None
     if session.internal_db_id:
         audio_path = interaction_store.upload_audio_to_storage(
@@ -173,15 +176,12 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
 
     try:
         if MODAL_ASR_URL:
-            # Send raw bytes directly to Modal — it has its own ffmpeg and handles
-            # any format (webm, wav, m4a). No local ffmpeg needed (Vercel doesn't have it).
             result = asr.transcribe_remote_bytes(
                 content,
                 content_type=audio.content_type or "audio/webm",
                 image_id=session.image_id,
             )
         else:
-            # Local path: convert webm → wav with local ffmpeg, then transcribe.
             if suffix == ".webm":
                 import subprocess
                 wav_path = tmp_path.replace(".webm", ".wav")
@@ -189,17 +189,17 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
                     ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
                     capture_output=True, check=True,
                 )
-                tmp_path = wav_path
-            result = asr.transcribe(tmp_path, image_id=session.image_id)
+                result = asr.transcribe(wav_path, image_id=session.image_id)
+            else:
+                result = asr.transcribe(tmp_path, image_id=session.image_id)
 
     except Exception:
         traceback.print_exc()
         raise HTTPException(500, "Transcription failed")
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
-        # Also clean up wav_path if we created it during local conversion
-        if suffix == ".webm" and not MODAL_ASR_URL:
-            Path(tmp_path.replace(".webm", ".wav")).unlink(missing_ok=True)
+        Path(webm_path).unlink(missing_ok=True)
+        if wav_path:
+            Path(wav_path).unlink(missing_ok=True)
 
     if session.internal_db_id and session.current_question:
         q = session.current_question
@@ -227,7 +227,7 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
 @app.post("/api/evaluate")
 async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
     user_id = interaction_store.verify_token_and_get_user(token)
-    session = sessions.get_session(req.session_id)
+    session = sessions.get_session(req.session_id) or sessions.recover_session(req.session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
 
@@ -309,7 +309,7 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
 @app.post("/api/session/{session_id}/end")
 async def end_session(session_id: str, token: str = Depends(get_token)):
     user_id = interaction_store.verify_token_and_get_user(token)
-    session = sessions.get_session(session_id)
+    session = sessions.get_session(session_id) or sessions.recover_session(session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
     session.completed = True
@@ -318,7 +318,7 @@ async def end_session(session_id: str, token: str = Depends(get_token)):
         scores = session.compute_scores()
         # Ensure we compute engagement for completion
         if user_id and scores.get("avg_latency_ms") is not None:
-             past_latencies = _fetch_past_latencies(user_id)
+             past_latencies = _fetch_past_latencies(user_id, token)
              if len(past_latencies) >= ENGAGEMENT_MIN_SESSIONS:
                  baseline = sum(past_latencies) / len(past_latencies)
                  if baseline > 0:
@@ -338,11 +338,11 @@ async def end_session(session_id: str, token: str = Depends(get_token)):
 # Summary
 # ---------------------------------------------------------------------------
 
-ENGAGEMENT_BASELINE_N = 5
-ENGAGEMENT_MIN_SESSIONS = 3
+ENGAGEMENT_BASELINE_N = 5      # how many past sessions to average for baseline
+ENGAGEMENT_MIN_SESSIONS = 5   # minimum sessions required before engagement is computed
 
 
-def _fetch_past_latencies(user_id: str) -> list[float]:
+def _fetch_past_latencies(user_id: str, token: str) -> list[float]:
     """Query Supabase for the user's past N sessions' avg_latency_ms."""
     sb_url = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "").rstrip("/")
     sb_key = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
@@ -350,7 +350,7 @@ def _fetch_past_latencies(user_id: str) -> list[float]:
         return []
 
     url = (
-        f"{sb_url}/rest/v1/sessions"
+        f"{sb_url}/rest/v1/therapy_sessions"
         f"?user_id=eq.{user_id}"
         f"&avg_latency_ms=not.is.null"
         f"&select=avg_latency_ms"
@@ -359,7 +359,7 @@ def _fetch_past_latencies(user_id: str) -> list[float]:
     )
     req = urllib.request.Request(url, headers={
         "apikey": sb_key,
-        "Authorization": f"Bearer {sb_key}",
+        "Authorization": f"Bearer {token}",
     })
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -370,7 +370,7 @@ def _fetch_past_latencies(user_id: str) -> list[float]:
         return []
 
 
-def _count_past_sessions(user_id: str) -> int:
+def _count_past_sessions(user_id: str, token: str) -> int:
     """Count how many past sessions exist for this user."""
     sb_url = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "").rstrip("/")
     sb_key = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
@@ -378,19 +378,18 @@ def _count_past_sessions(user_id: str) -> int:
         return 0
 
     url = (
-        f"{sb_url}/rest/v1/sessions"
+        f"{sb_url}/rest/v1/therapy_sessions"
         f"?user_id=eq.{user_id}"
         f"&select=id"
         f"&limit=100"
     )
     req = urllib.request.Request(url, headers={
         "apikey": sb_key,
-        "Authorization": f"Bearer {sb_key}",
+        "Authorization": f"Bearer {token}",
         "Prefer": "count=exact",
     })
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            # The content-range header has the total count
             cr = resp.headers.get("content-range", "")
             if "/" in cr:
                 total = cr.split("/")[-1]
@@ -405,7 +404,7 @@ def _count_past_sessions(user_id: str) -> int:
 @app.get("/api/session/{session_id}/summary")
 async def session_summary(session_id: str, token: str = Depends(get_token)):
     user_id = interaction_store.verify_token_and_get_user(token)
-    session = sessions.get_session(session_id)
+    session = sessions.get_session(session_id) or sessions.recover_session(session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
 
@@ -414,8 +413,8 @@ async def session_summary(session_id: str, token: str = Depends(get_token)):
 
     # --- Compute Engagement from cross-session baseline ---
     if user_id and scores.get("avg_latency_ms") is not None:
-        past_latencies = _fetch_past_latencies(user_id)
-        past_count = _count_past_sessions(user_id)
+        past_latencies = _fetch_past_latencies(user_id, token)
+        past_count = _count_past_sessions(user_id, token)
 
         if len(past_latencies) >= ENGAGEMENT_MIN_SESSIONS:
             baseline = sum(past_latencies) / len(past_latencies)

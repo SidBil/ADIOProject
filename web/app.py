@@ -172,34 +172,34 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
         )
 
     try:
-        if suffix == ".webm":
-            import subprocess
-            wav_path = tmp_path.replace(".webm", ".wav")
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
-                capture_output=True, check=True,
-            )
-            tmp_path = wav_path
-
         if MODAL_ASR_URL:
-            with open(tmp_path, "rb") as f:
-                wav_bytes = f.read()
+            # Send raw bytes directly to Modal — it has its own ffmpeg and handles
+            # any format (webm, wav, m4a). No local ffmpeg needed (Vercel doesn't have it).
             result = asr.transcribe_remote_bytes(
-                wav_bytes,
-                content_type="audio/wav",
+                content,
+                content_type=audio.content_type or "audio/webm",
                 image_id=session.image_id,
             )
         else:
+            # Local path: convert webm → wav with local ffmpeg, then transcribe.
+            if suffix == ".webm":
+                import subprocess
+                wav_path = tmp_path.replace(".webm", ".wav")
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
+                    capture_output=True, check=True,
+                )
+                tmp_path = wav_path
             result = asr.transcribe(tmp_path, image_id=session.image_id)
-            
+
     except Exception:
         traceback.print_exc()
         raise HTTPException(500, "Transcription failed")
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-        # Also clean up wav_path if we created it
-        if suffix == ".webm":
-             Path(tmp_path.replace(".webm", ".wav")).unlink(missing_ok=True)
+        # Also clean up wav_path if we created it during local conversion
+        if suffix == ".webm" and not MODAL_ASR_URL:
+            Path(tmp_path.replace(".webm", ".wav")).unlink(missing_ok=True)
 
     if session.internal_db_id and session.current_question:
         q = session.current_question

@@ -71,6 +71,9 @@ export default function SessionScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedbackData, setFeedbackData] = useState<any>(null);
+  const [processingStep, setProcessingStep] = useState<"transcribing" | "evaluating" | "speaking" | null>(null);
+  const [heardText, setHeardText] = useState<string>("");
+  const [adioComment, setAdioComment] = useState<string>("");
   const recordingRef = useRef<Audio.Recording | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [yellowPressed, setYellowPressed] = useState(false);
@@ -161,6 +164,9 @@ export default function SessionScreen({
       track("recording_stopped", { duration_ms: recordingDurationMs });
 
       setIsProcessing(true);
+      setProcessingStep("transcribing");
+      setHeardText("");
+      setAdioComment("");
 
       const mimeType =
         Platform.OS === "web"
@@ -176,20 +182,23 @@ export default function SessionScreen({
         return;
       }
 
+      setHeardText(transcription);
+      setProcessingStep("evaluating");
+
       const eData = await evaluate(
         session.session_id,
         transcription,
         initiationLatencyMsRef.current,
       );
-      track("evaluation_completed", { 
+      track("evaluation_completed", {
         latency_ms: eData.evaluation?.llm_latency_ms || 0,
-        followup_created: !!eData.followup 
+        followup_created: !!eData.followup
       });
 
-      // Pre-calculate comment to wait for it before showing feedback card
       const comment = eData.followup || eData.evaluation?.feedback || "";
       if (comment) {
-        // This now waits until the audio actually starts playing
+        setAdioComment(comment);
+        setProcessingStep("speaking");
         await speakTTS(comment).catch(() => {});
       }
 
@@ -214,9 +223,11 @@ export default function SessionScreen({
 
   function handleNext() {
     setBurstCount((n) => n + 1);
-    // Reset the question timer for the next question
     questionShownAtRef.current = Date.now();
     initiationLatencyMsRef.current = undefined;
+    setHeardText("");
+    setAdioComment("");
+    setProcessingStep(null);
     if (session.progress.completed || !session.question) {
       track("session_completed", { 
         questions_answered: session.progress.answered,
@@ -289,6 +300,9 @@ export default function SessionScreen({
                   question={session.question}
                   isRecording={isRecording}
                   isProcessing={isProcessing}
+                  processingStep={processingStep}
+                  heardText={heardText}
+                  adioComment={adioComment}
                   onToggle={toggleRecording}
                   pressed={yellowPressed}
                   onMicLayout={setMicCenter}
@@ -315,6 +329,9 @@ export default function SessionScreen({
                   question={session.question}
                   isRecording={isRecording}
                   isProcessing={isProcessing}
+                  processingStep={processingStep}
+                  heardText={heardText}
+                  adioComment={adioComment}
                   onToggle={toggleRecording}
                   pressed={yellowPressed}
                   onMicLayout={setMicCenter}
@@ -339,6 +356,9 @@ function QuestionCard({
   question,
   isRecording,
   isProcessing,
+  processingStep,
+  heardText,
+  adioComment,
   onToggle,
   pressed,
   onMicLayout,
@@ -346,6 +366,9 @@ function QuestionCard({
   question: Question | null;
   isRecording: boolean;
   isProcessing: boolean;
+  processingStep?: "transcribing" | "evaluating" | "speaking" | null;
+  heardText?: string;
+  adioComment?: string;
   onToggle: () => void;
   pressed: boolean;
   onMicLayout?: (center: { x: number; y: number }) => void;
@@ -365,7 +388,10 @@ function QuestionCard({
   if (!question) return null;
 
   const label = isProcessing
-    ? "Processing…"
+    ? processingStep === "transcribing" ? "I heard you, I'm working on it!"
+    : processingStep === "evaluating"  ? "I heard you, I'm working on it!"
+    : processingStep === "speaking"    ? "Adio says:"
+    : "Processing…"
     : isRecording
     ? "Listening… tap to stop"
     : "Tap to Answer";
@@ -454,6 +480,9 @@ function QuestionCard({
           </View>
         </TouchableOpacity>
         <Text style={qStyles.micLabel}>{label}</Text>
+        {!!heardText && (
+          <Text style={qStyles.heardText}>"{heardText}"</Text>
+        )}
       </Animated.View>
     </View>
   );
@@ -526,6 +555,24 @@ const qStyles = StyleSheet.create({
     fontSize: 24,
     color: colors.darkBlue,
     textAlign: "center",
+  },
+  heardText: {
+    fontFamily: fonts.body,
+    fontSize: 18,
+    color: colors.darkBlue,
+    textAlign: "center",
+    fontStyle: "italic",
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  adioText: {
+    fontFamily: fonts.body,
+    fontSize: 18,
+    color: colors.darkBlue,
+    textAlign: "center",
+    lineHeight: 26,
+    marginTop: 6,
+    paddingHorizontal: 4,
   },
 });
 

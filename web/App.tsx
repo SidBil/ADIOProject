@@ -47,6 +47,16 @@ export default function App() {
   // token refreshes / user-update events don't navigate away from an active session.
   const initialAuthDone = useRef(false);
 
+  // Auto-sign-in with dev account on localhost so Google OAuth redirect isn't needed
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+      supabase.auth.signInWithPassword({
+        email: "dev@adio.local",
+        password: "devlocal123",
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const checkProfile = async (u: User, isInitial: boolean) => {
       try {

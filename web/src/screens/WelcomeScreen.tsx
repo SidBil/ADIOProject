@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,26 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
   const [loading, setLoading] = useState(false);
   const [beginPressed, setBeginPressed] = useState(false);
   const [historyPressed, setHistoryPressed] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const msgIndexRef = useRef(0);
+
+  const LOADING_MESSAGES = [
+    "Getting everything ready for you!",
+    "Warming up Adio…",
+    "Almost there!",
+    "Just a few more seconds…",
+  ];
+
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingMsg(LOADING_MESSAGES[0]);
+    msgIndexRef.current = 0;
+    const interval = setInterval(() => {
+      msgIndexRef.current = Math.min(msgIndexRef.current + 1, LOADING_MESSAGES.length - 1);
+      setLoadingMsg(LOADING_MESSAGES[msgIndexRef.current]);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handlePress = async () => {
     setLoading(true);
@@ -120,7 +140,7 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
             ]}
           >
             {loading ? (
-              <ActivityIndicator color={colors.darkBlue} />
+              <Text style={[styles.beginBtnText, { fontSize: btnFontSz * 0.7 }]}>{loadingMsg}</Text>
             ) : (
               <Text style={[styles.beginBtnText, { fontSize: btnFontSz }]}>Begin a Session</Text>
             )}

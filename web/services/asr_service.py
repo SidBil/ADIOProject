@@ -14,6 +14,7 @@ from pathlib import Path
 WEB_ROOT = Path(__file__).resolve().parent.parent
 
 MODAL_ASR_URL = os.environ.get("MODAL_ASR_URL")
+MODAL_WARMUP_URL = os.environ.get("MODAL_WARMUP_URL")
 
 
 class ASRService:
@@ -89,6 +90,17 @@ class ASRService:
         if MODAL_ASR_URL:
             return self._transcribe_remote(audio_path, image_id, alpha)
         return self._transcribe_local(audio_path, image_id, alpha, num_beams)
+
+    def warmup(self) -> bool:
+        """Ping Modal warmup endpoint — blocks until container is up and models are loaded."""
+        if not MODAL_WARMUP_URL:
+            return False
+        try:
+            resp = requests.get(MODAL_WARMUP_URL, timeout=120)
+            return resp.status_code == 200
+        except Exception as e:
+            print(f"[ASR] Warmup failed: {e}")
+            return False
 
     def transcribe_remote_bytes(self, audio_bytes: bytes, content_type: str = "audio/webm",
                                 image_id: str | None = None, alpha: float = 0.3) -> dict:

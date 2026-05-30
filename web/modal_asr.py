@@ -80,9 +80,23 @@ class ASRModel:
         self.image_embeddings = dict(data)
         print(f"[Modal ASR] Ready — {len(self.image_embeddings)} image embeddings loaded")
 
-    @modal.method()
-    def transcribe(self, audio_bytes: bytes, image_id: str | None = None,
-                   alpha: float = 0.3, num_beams: int = 5) -> dict:
+    @modal.fastapi_endpoint(method="GET")
+    async def warmup(self):
+        """Ping to wake the container before the session starts."""
+        return {"status": "warm", "images_loaded": len(self.image_embeddings)}
+
+    @modal.fastapi_endpoint(method="POST")
+    async def transcribe_endpoint(
+        self,
+        audio: fastapi.UploadFile = fastapi.File(...),
+        image_id: str = fastapi.Form(default=None),
+        alpha: float = fastapi.Form(default=0.3),
+    ):
+        audio_bytes = await audio.read()
+        return self._run_transcribe(audio_bytes, image_id=image_id, alpha=alpha)
+
+    def _run_transcribe(self, audio_bytes: bytes, image_id: str | None = None,
+                        alpha: float = 0.3, num_beams: int = 3) -> dict:
         import re
         import io
         import subprocess
@@ -204,16 +218,3 @@ class ASRModel:
             })
         rescored.sort(key=lambda h: h["fused_score"], reverse=True)
         return rescored
-
-
-@app.function(gpu="T4", scaledown_window=300, image=image)
-@modal.fastapi_endpoint(method="POST")
-async def transcribe_endpoint(
-    audio: fastapi.UploadFile = fastapi.File(...),
-    image_id: str = fastapi.Form(default=None),
-    alpha: float = fastapi.Form(default=0.3),
-):
-    audio_bytes = await audio.read()
-    model = ASRModel()
-    result = model.transcribe.remote(audio_bytes, image_id=image_id, alpha=alpha)
-    return result

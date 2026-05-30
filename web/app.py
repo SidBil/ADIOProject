@@ -23,6 +23,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
+import asyncio
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.responses import FileResponse, StreamingResponse
@@ -106,9 +107,17 @@ async def start_session(req: StartRequest, token: str = Depends(get_token)):
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    session.internal_db_id = interaction_store.create_therapy_session(
-        token, user_id, session.session_id, session.image_id, session.image_filename
+    # Run DB insert and Modal container warmup in parallel.
+    # Session start blocks until both finish — the warmup ensures the container
+    # is loaded before the user records their first answer.
+    db_id, _ = await asyncio.gather(
+        asyncio.to_thread(
+            interaction_store.create_therapy_session,
+            token, user_id, session.session_id, session.image_id, session.image_filename,
+        ),
+        asyncio.to_thread(asr.warmup),
     )
+    session.internal_db_id = db_id
 
     q = session.current_question
     return {

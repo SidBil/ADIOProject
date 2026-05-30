@@ -202,9 +202,9 @@ async def transcribe(session_id: str, audio: UploadFile = File(...), token: str 
             else:
                 result = asr.transcribe(tmp_path, image_id=session.image_id)
 
-    except Exception:
+    except Exception as e:
         traceback.print_exc()
-        raise HTTPException(500, "Transcription failed")
+        raise HTTPException(500, f"Transcription failed: {type(e).__name__}: {e}")
     finally:
         Path(webm_path).unlink(missing_ok=True)
         if wav_path:

@@ -15,20 +15,17 @@ def get_supabase_client(token: Optional[str] = None) -> Client:
         raise ValueError("Supabase URL or Key is missing from environment variables.")
         
     supabase: Client = create_client(url, key)
-    
+
     if token:
         # Set postgrest auth so RLS policies apply correctly.
         supabase.postgrest.auth(token)
-        # storage3 (used by supabase-py 2.x) has no public .auth() method;
-        # set the Authorization header directly instead.
-        try:
-            if hasattr(supabase.storage, "auth"):
-                supabase.storage.auth(token)
-            else:
-                supabase.storage._client.headers["Authorization"] = f"Bearer {token}"
-        except Exception as e:
-            print(f"Warning: could not set storage auth token: {e}")
-            
+        # Inject the user JWT before supabase.storage is first accessed.
+        # supabase.storage is lazy-initialized using supabase.options.headers,
+        # so updating here ensures the storage client is built with the user token.
+        # (storage3 stores a frozen header snapshot at init time, so we can't
+        # patch it after the fact via supabase.storage._client.headers.)
+        supabase.options.headers["Authorization"] = f"Bearer {token}"
+
     return supabase
 
 def verify_token_and_get_user(token: str) -> str:

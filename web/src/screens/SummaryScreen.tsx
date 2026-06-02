@@ -14,7 +14,6 @@ import {
 import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { getSummary } from "../api";
-import ShapePattern from "../components/ShapePattern";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const gaugeArcImg    = require("../../assets/Untitled-6-01.png");
@@ -207,8 +206,6 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
 
   return (
     <View style={[s.root, { width: winW, minHeight: winH }]}>
-      <ShapePattern />
-
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: pad * 2 }}

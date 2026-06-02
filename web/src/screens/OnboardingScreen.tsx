@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
-import ShapePattern from "../components/ShapePattern";
 
 
 interface Props {
@@ -70,7 +69,6 @@ export default function OnboardingScreen({ onComplete, userId }: Props) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ShapePattern burst={0} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"

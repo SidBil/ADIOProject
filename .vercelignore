@@ -1,0 +1,11 @@
+venv/
+audio/
+asr/
+webV1/
+imagegen/
+multimodal/
+web/venv/
+web/node_modules/
+web/__pycache__/
+web/services/__pycache__/
+web/data/cache/

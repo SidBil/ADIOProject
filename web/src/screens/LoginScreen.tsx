@@ -16,7 +16,6 @@ import {
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
 import { track } from "../lib/analytics";
-import ShapePattern from "../components/ShapePattern";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const privacyPdf = require("../constants/legal/Adio_Privacy_Policy.docx.pdf");
@@ -112,7 +111,6 @@ export default function LoginScreen({ onAuth }: Props) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ShapePattern burst={burstCount} cardCenter={clickCenter} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"

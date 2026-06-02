@@ -12,7 +12,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { colors, fonts } from "../theme";
-import ShapePattern from "../components/ShapePattern";
 
 interface Props {
   onStart: () => Promise<void>;
@@ -84,8 +83,6 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
 
   return (
     <View style={[styles.container, { width: winW, height: winH }]}>
-      <ShapePattern />
-
       {onSignOut && (
         <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
           <Text style={[styles.signOutText, { fontSize: hintSz }]}>Sign Out</Text>

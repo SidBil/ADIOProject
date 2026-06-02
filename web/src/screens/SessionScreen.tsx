@@ -17,7 +17,6 @@ import { colors, fonts } from "../theme";
 import { imageUrl, transcribeAudio, evaluate, endSession, speakTTS } from "../api";
 import { track } from "../lib/analytics";
 import Stars from "../components/Stars";
-import ShapePattern from "../components/ShapePattern";
 import useVolumeMeter from "../hooks/useVolumeMeter";
 
 function showAlert(title: string, msg: string) {
@@ -256,7 +255,6 @@ export default function SessionScreen({
 
   return (
     <View style={styles.container}>
-      <ShapePattern volume={volume} burst={burstCount} cardCenter={micCenter} swirl={isProcessing} />
       {/* ─── Top Bar ─── */}
       <View style={styles.topBar}>
         <Image
@@ -480,8 +478,11 @@ function QuestionCard({
           </View>
         </TouchableOpacity>
         <Text style={qStyles.micLabel}>{label}</Text>
-        {!!heardText && (
+        {!!heardText && processingStep !== "speaking" && (
           <Text style={qStyles.heardText}>"{heardText}"</Text>
+        )}
+        {!!adioComment && processingStep === "speaking" && (
+          <Text style={qStyles.adioText}>{adioComment}</Text>
         )}
       </Animated.View>
     </View>

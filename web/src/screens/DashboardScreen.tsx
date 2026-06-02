@@ -11,7 +11,6 @@ import {
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
 import { imageUrl } from "../api";
-import ShapePattern from "../components/ShapePattern";
 
 interface SessionRow {
   id: string;
@@ -70,7 +69,6 @@ export default function DashboardScreen({ onBack, onStartSession }: Props) {
 
   return (
     <View style={styles.container}>
-      <ShapePattern />
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backText}>Back</Text>

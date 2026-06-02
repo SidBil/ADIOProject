@@ -38,6 +38,9 @@ yarn-error.*
 __pycache__/
 *.pyc
 
+# Local test scripts (may contain secrets)
+test_*.py
+
 # typescript
 *.tsbuildinfo
 

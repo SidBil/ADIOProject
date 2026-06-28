@@ -11,15 +11,16 @@ import {
   Pressable,
   useWindowDimensions,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { getSummary } from "../api";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const adioLogo = require("../../assets/adiologo.png");
+const adioLogo = require("../../assets/adiologo2.png");
 const brainIcon = require("../../assets/brain.png");
 const eyeIcon = require("../../assets/eye.png");
 const targetIcon = require("../../assets/target.png");
+const starIcon = require("../../assets/star-04.png");
 
 interface Props {
   sessionId: string;
@@ -35,46 +36,33 @@ type MetricKey = "understanding" | "observation" | "engagement";
 
 const PALETTE: Record<MetricKey, {
   cardBg: string;
-  border: string;
-  score: string;
+  iconBg: string;
+  ringTrack: string;
+  accent: string;
   scoreMuted: string;
 }> = {
   understanding: {
     cardBg: "#FDF1F5",
-    border: colors.pinkBorder,
-    score: "#EB008C",
+    iconBg: "#F9D9E5",
+    ringTrack: "#EFD7E0",
+    accent: "#EB008C",
     scoreMuted: "#C75A8F",
   },
   observation: {
     cardBg: "#F3F8EA",
-    border: colors.greenBorder,
-    score: "#6FB400",
+    iconBg: "#DDEBC0",
+    ringTrack: "#DCE6CB",
+    accent: "#6FB400",
     scoreMuted: "#7E9450",
   },
   engagement: {
     cardBg: "#FFFAEA",
-    border: colors.yellowBorder,
-    score: "#F5B400",
+    iconBg: "#FBEFC2",
+    ringTrack: "#EFE6CB",
+    accent: "#F5B400",
     scoreMuted: "#B8862E",
   },
 };
-
-/* ═══════════════════════════════════════════════════════════════
-   Star SVG
-   ═══════════════════════════════════════════════════════════════ */
-function StarIcon({ size = 50 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-        fill={colors.yellowCard}
-        stroke={colors.yellowBorder}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════
    Helpers
@@ -83,18 +71,18 @@ function gaugeMessage(kind: MetricKey, v: number | null): string {
   if (v == null) return "";
   const pct = Math.round(v * 100);
   if (kind === "understanding") {
-    if (pct >= 80) return "Great job understanding most of the ideas!";
-    if (pct >= 50) return "You're getting there, keep describing!";
-    return "Let's keep practicing together!";
+    if (pct >= 80) return "Excellent comprehension!";
+    if (pct >= 50) return "Good comprehension!";
+    return "Keep practicing!";
   }
   if (kind === "observation") {
-    if (pct >= 80) return "You noticed many important details!";
-    if (pct >= 50) return "Good eye! Try spotting even more next time.";
-    return "Look closely, there's so much to find!";
+    if (pct >= 80) return "Good attention to detail!";
+    if (pct >= 50) return "Nice eye for detail!";
+    return "Look a little closer next time!";
   }
-  if (pct >= 80) return "You stayed focused and participated!";
-  if (pct >= 50) return "Nice focus! Let's keep it going.";
-  return "Try to stay focused a little longer next time!";
+  if (pct >= 80) return "Great focus and effort!";
+  if (pct >= 50) return "Good focus and effort!";
+  return "Stay focused a bit longer!";
 }
 
 function encouragement(scores: any): string {
@@ -156,23 +144,28 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
 
   // Responsive scaling
   const pad         = Math.max(14, winW * 0.018);
-  const titleSz     = Math.max(48, Math.min(96, winH * 0.11));
+  const titleSz     = Math.max(60, Math.min(120, winH * 0.14));
   const subSz       = Math.max(18, Math.min(28, winH * 0.032));
-  const logoH       = Math.max(60, Math.min(96, winH * 0.09));
-  const logoW       = logoH * 2.4;
+  // Fixed logo size + position to match SessionScreen exactly.
+  const logoH       = 150;
+  const logoW       = 170;
 
-  const cardGap     = Math.max(12, winW * 0.014);
-  // Larger square cards
+  const cardGap     = Math.max(16, winW * 0.018);
+  const cardsAvail  = winW - pad * 2;
   const cardW       = isMobile
     ? winW - pad * 2
-    : Math.min((winW - pad * 2 - cardGap * 2) / 3, 380);
-  const cardPad     = Math.max(20, winH * 0.025);
+    : Math.max(300, Math.min((cardsAvail - cardGap * 2) / 3, 620));
+  const cardH       = cardW * 0.95;
+  const cardPad     = Math.max(24, cardW * 0.07);
 
-  // Sizes are based on viewport height so narrower cards stay tall
-  const iconSize    = Math.max(150, Math.min(230, winH * 0.27));
-  const labelSz     = Math.max(28, Math.min(44, winH * 0.052));
-  const scoreSz     = Math.max(42, Math.min(64, winH * 0.075));
-  const descSz      = Math.max(14, Math.min(18, winH * 0.022));
+  // Top-row sizing: icon (left) and progress ring (right) share the row.
+  const iconCircle  = Math.min(cardW * 0.42, 200);
+  const iconImg     = iconCircle;
+  const ringSize    = Math.min(cardW * 0.44, 220);
+
+  const labelSz     = Math.min(cardW * 0.13, 60);
+  const scoreSz     = Math.min(ringSize * 0.46, 64);
+  const descSz      = Math.min(cardW * 0.065, 28);
 
   const starIconSz  = Math.max(60, Math.min(100, winH * 0.12));
   const starCountSz = Math.max(28, Math.min(48, winH * 0.055));
@@ -195,18 +188,24 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
         contentContainerStyle={{ paddingBottom: pad * 2 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ════════  SUMMARY PAGE — fits one screen ════════ */}
-        <View style={{ width: winW, minHeight: winH, paddingHorizontal: pad, paddingTop: pad }}>
+        {/* ════════  SUMMARY PAGE — title at top, cards + continue vertically centered ════════ */}
+        <View style={{
+          width: winW,
+          minHeight: winH,
+          paddingHorizontal: pad,
+          paddingTop: pad,
+        }}>
 
-          {/* ── Logo (top-left, absolute so it doesn't push title down) ── */}
+          {/* ── Logo (matches SessionScreen exactly: 170×150 at left:20, vertically centered on a 52px topbar at top:20) ── */}
           <Image
             source={adioLogo}
             style={{
               width: logoW,
               height: logoH,
               position: "absolute",
-              top: pad,
-              left: pad,
+              top: -29,
+              left: 20,
+              zIndex: 10,
             }}
             resizeMode="contain"
           />
@@ -219,11 +218,13 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
             </Text>
           </View>
 
+          {/* ── Cards + Continue group, vertically centered in remaining space ── */}
+          <View style={{ flex: 1, justifyContent: "center", minHeight: 0 }}>
+
           {/* ── 3 Score Cards ── */}
           <View style={{
             flexDirection: isMobile ? "column" : "row",
             gap: cardGap,
-            marginTop: pad * 2,
             justifyContent: "center",
           }}>
             <ScoreCard
@@ -232,10 +233,13 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
               icon={brainIcon}
               value={scores.understanding ?? null}
               cardW={cardW}
+              cardH={cardH}
               cardPad={cardPad}
               cardBorder={cardBorder}
               cardRadius={cardRadius}
-              iconSize={iconSize}
+              iconCircle={iconCircle}
+              iconImg={iconImg}
+              ringSize={ringSize}
               labelSz={labelSz}
               scoreSz={scoreSz}
               descSz={descSz}
@@ -247,10 +251,13 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
               icon={eyeIcon}
               value={scores.observation ?? null}
               cardW={cardW}
+              cardH={cardH}
               cardPad={cardPad}
               cardBorder={cardBorder}
               cardRadius={cardRadius}
-              iconSize={iconSize}
+              iconCircle={iconCircle}
+              iconImg={iconImg}
+              ringSize={ringSize}
               labelSz={labelSz}
               scoreSz={scoreSz}
               descSz={descSz}
@@ -262,10 +269,13 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
               icon={targetIcon}
               value={scores.engagement ?? null}
               cardW={cardW}
+              cardH={cardH}
               cardPad={cardPad}
               cardBorder={cardBorder}
               cardRadius={cardRadius}
-              iconSize={iconSize}
+              iconCircle={iconCircle}
+              iconImg={iconImg}
+              ringSize={ringSize}
               labelSz={labelSz}
               scoreSz={scoreSz}
               descSz={descSz}
@@ -283,7 +293,11 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
           }}>
             {/* Stars */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: pad * 0.4 }}>
-              <StarIcon size={starIconSz} />
+              <Image
+                source={starIcon}
+                style={{ width: starIconSz, height: starIconSz }}
+                resizeMode="contain"
+              />
               <View>
                 <Text style={[s.starCount, { fontSize: starCountSz }]}>
                   {starsEarned} / {total}
@@ -318,6 +332,8 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
               </View>
             </Pressable>
           </View>
+
+          </View>{/* end cards+continue centered group */}
         </View>
 
         {/* ════════  QUESTION HISTORY ════════ */}
@@ -364,20 +380,62 @@ export default function SummaryScreen({ sessionId, imageId, userId, onNewSession
 /* ═══════════════════════════════════════════════════════════════
    ScoreCard
    ═══════════════════════════════════════════════════════════════ */
+function ProgressRing({
+  size, stroke, progress, trackColor, fillColor,
+}: {
+  size: number;
+  stroke: number;
+  progress: number; // 0..1
+  trackColor: string;
+  fillColor: string;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dashOffset = c * (1 - Math.max(0, Math.min(1, progress)));
+  return (
+    <Svg width={size} height={size}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        stroke={trackColor}
+        strokeWidth={stroke}
+        fill="none"
+      />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        stroke={fillColor}
+        strokeWidth={stroke}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={`${c} ${c}`}
+        strokeDashoffset={dashOffset}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </Svg>
+  );
+}
+
 function ScoreCard({
   metric, label, icon, value,
-  cardW, cardPad, cardBorder, cardRadius,
-  iconSize, labelSz, scoreSz, descSz, pad,
+  cardW, cardH, cardPad, cardBorder, cardRadius,
+  iconCircle, iconImg, ringSize,
+  labelSz, scoreSz, descSz, pad,
 }: {
   metric: MetricKey;
   label: string;
   icon: any;
   value: number | null;
   cardW: number;
+  cardH: number;
   cardPad: number;
   cardBorder: number;
   cardRadius: number;
-  iconSize: number;
+  iconCircle: number;
+  iconImg: number;
+  ringSize: number;
   labelSz: number;
   scoreSz: number;
   descSz: number;
@@ -385,64 +443,80 @@ function ScoreCard({
 }) {
   const p = PALETTE[metric];
   const tenth = value != null ? Math.round(value * 10) : null;
+  const progress = value != null ? Math.max(0, Math.min(1, value)) : 0;
+  const ringStroke = Math.max(8, ringSize * 0.1);
 
   const cardWebShadow = Platform.OS === "web"
-    ? ({ boxShadow: `0px ${cardBorder + 2}px 0px ${p.border}` } as any)
+    ? ({ boxShadow: `0px ${cardBorder + 2}px 0px ${colors.darkBlueText}` } as any)
     : undefined;
 
   return (
     <View style={[{
       width: cardW,
-      aspectRatio: 1,
+      minHeight: cardH,
       backgroundColor: p.cardBg,
       borderWidth: cardBorder,
-      borderColor: p.border,
+      borderColor: colors.darkBlueText,
       borderRadius: cardRadius,
       padding: cardPad,
-      alignItems: "center",
-      justifyContent: "center",
       marginBottom: cardBorder + 2,
     },
       Platform.OS === "web"
         ? cardWebShadow
         : {
-            shadowColor: p.border,
+            shadowColor: colors.darkBlueText,
             shadowOffset: { width: 0, height: cardBorder + 2 },
             shadowOpacity: 1,
             shadowRadius: 0,
             elevation: 4,
           },
     ]}>
-      {/* Icon */}
-      <Image
-        source={icon}
-        style={{ width: iconSize, height: iconSize, marginBottom: pad * 0.6 }}
-        resizeMode="contain"
-      />
+      {/* Top row: icon circle + progress ring with score */}
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-around",
+        marginBottom: pad * 0.6,
+      }}>
+        <Image
+          source={icon}
+          style={{ width: iconCircle, height: iconCircle }}
+          resizeMode="contain"
+        />
+
+        <View style={{ width: ringSize, height: ringSize, alignItems: "center", justifyContent: "center" }}>
+          <ProgressRing
+            size={ringSize}
+            stroke={ringStroke}
+            progress={progress}
+            trackColor={p.ringTrack}
+            fillColor={p.accent}
+          />
+          <View style={{
+            position: "absolute",
+            width: ringSize,
+            height: ringSize,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+          }}>
+            <Text style={[s.cardScore, { fontSize: scoreSz, color: p.accent }]}>
+              {tenth != null ? tenth : "—"}
+            </Text>
+            <Text style={[s.cardScore, { fontSize: scoreSz * 0.45, color: p.scoreMuted, marginLeft: 2, marginTop: scoreSz * 0.25 }]}>
+              {" /10"}
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {/* Label */}
-      <Text style={[s.cardLabel, { fontSize: labelSz, marginBottom: pad * 0.2 }]}>
+      <Text style={[s.cardLabel, { fontSize: labelSz, marginTop: pad * 0.2, textAlign: "center" }]}>
         {label}
       </Text>
 
-      {/* Score */}
-      {tenth != null ? (
-        <Text style={{ marginBottom: pad * 0.4 }}>
-          <Text style={[s.cardScore, { fontSize: scoreSz, color: p.score }]}>
-            {tenth}
-          </Text>
-          <Text style={[s.cardScore, { fontSize: scoreSz, color: p.scoreMuted }]}>
-            {" / 10"}
-          </Text>
-        </Text>
-      ) : (
-        <Text style={[s.cardScore, { fontSize: scoreSz, color: p.scoreMuted, marginBottom: pad * 0.4 }]}>
-          {"— / 10"}
-        </Text>
-      )}
-
       {/* Description */}
-      <Text style={[s.cardDesc, { fontSize: descSz, lineHeight: descSz * 1.35 }]}>
+      <Text style={[s.cardDesc, { fontSize: descSz, lineHeight: descSz * 1.35, marginTop: pad * 0.3 }]}>
         {gaugeMessage(metric, value)}
       </Text>
     </View>

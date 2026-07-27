@@ -46,27 +46,31 @@ Your job is twofold:
 ──────────────────────────────────────────
 WHAT MAKES A GOOD QUESTION (follow these)
 ──────────────────────────────────────────
-• Require the child to produce at least a full sentence, not a single word.
-• Mix description ("Tell me about…", "Describe…") with inference ("Why do you think…",
-  "What might happen next…", "How can you tell…").
-• Build on each other — earlier questions scaffold later ones.
-• Use warm, encouraging language.  Never clinical.
+• Ask ONE short, direct question — aim for about 6-12 words.
+• Get straight to the point.  NO preambles like "Tell me about…",
+  "Describe everything…", or "If you could step into this picture…".
+• Still open-ended: it must invite a descriptive or inferential answer,
+  never a yes/no or a single fixed word.  Favor "What…", "Why…", "How…".
+• Use warm, simple language for a child.  Never clinical.
 
-BAD (do NOT write questions like these):
+BAD — too long / has a preamble (do NOT write like these):
+  "Tell me about the character you see in the picture. What do they look like?"
+  "Describe everything that is happening in this picture."
+  "If you could step into this picture, what is the first thing you would notice?"
+  "What mood or feeling does this picture give you, and what in the picture makes you feel that way?"
+
+ALSO BAD — one-word / forced-choice:
   "Who is in the picture?"          → child says "a cat" — done, no verbalization.
-  "What color is the ball?"         → child says "red" — one word.
-  "How many birds are there?"       → child says "two" — one word.
   "Is the dog big or small?"        → forced choice, not open-ended.
 
-GOOD (write questions like these):
-  "Tell me about the characters you see — what do they look like?"
-  "Describe everything that is happening in this picture."
-  "What do you think this place sounds like? Tell me all the sounds you imagine."
-  "Why do you think the character feels that way? What clues do you see?"
-  "If you could step into this picture, what is the first thing you would notice?"
-  "Look at the sizes of things — describe what is big and what is small."
-  "How can you tell that something is moving? Describe what the movement looks like."
-  "What mood or feeling does this picture give you, and what in the picture makes you feel that way?"
+GOOD — short, direct, still open-ended (write like these):
+  "What does the cat look like?"
+  "What is happening in this picture?"
+  "What sounds might you hear here?"
+  "Why do you think the character feels that way?"
+  "What is big and what is small?"
+  "How can you tell something is moving?"
+  "What mood does this picture give you?"
 
 ──────────────────────────────────────────
 
@@ -100,8 +104,9 @@ Return ONLY valid JSON with these exact keys:
 
 Rules:
 - Structure values: short factual phrases (2-8 words) — these are the EXPECTED answers.
-- Questions: 1-2 warm sentences each.  Must require a descriptive or inferential answer
-  of at least one full sentence.  Never answerable in one word.
+- Questions: ONE short, direct question each (~6-12 words).  Open-ended — must invite a
+  descriptive or inferential answer, never a yes/no or one-word reply.  No multi-sentence
+  questions and no "Tell me about…"/"Describe…" preambles.
 - Complexity: 1 = simple (few elements), 2 = moderate, 3 = complex (many elements).
 - Return ONLY the JSON object, no markdown."""
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import { useFonts } from "expo-font";
 import {
   LeagueSpartan_400Regular,
@@ -11,6 +11,7 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
 } from "@expo-google-fonts/inter";
+import { Fredoka_600SemiBold } from "@expo-google-fonts/fredoka";
 import { Session, User } from "@supabase/supabase-js";
 
 import LoginScreen from "./src/screens/LoginScreen";
@@ -35,11 +36,12 @@ export default function App() {
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
+    Fredoka_600SemiBold,
   });
 
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [screen, setScreen] = useState<Screen>("landing");
+  const [screen, setScreen] = useState<Screen>(Platform.OS === "web" ? "landing" : "welcome");
   const [session, setSession] = useState<any>(null);
 
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -49,7 +51,7 @@ export default function App() {
 
   // Auto-sign-in with dev account on localhost so Google OAuth redirect isn't needed
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    if (typeof window !== "undefined" && window.location?.hostname === "localhost") {
       supabase.auth.signInWithPassword({
         email: "dev@adio.local",
         password: "devlocal123",

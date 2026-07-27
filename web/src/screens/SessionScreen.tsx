@@ -4,9 +4,8 @@ import {
   Text,
   Image,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
-  Animated,
-  Easing,
   Platform,
   Alert,
   ScrollView,
@@ -75,12 +74,26 @@ export default function SessionScreen({
   const [adioComment, setAdioComment] = useState<string>("");
   const recordingRef = useRef<Audio.Recording | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [yellowPressed, setYellowPressed] = useState(false);
-  const [burstCount, setBurstCount] = useState(0);
   const [micCenter, setMicCenter] = useState<{ x: number; y: number } | undefined>();
   const { volume, startMetering, stopMetering } = useVolumeMeter();
   const questionShownAtRef = useRef<number>(Date.now());
   const initiationLatencyMsRef = useRef<number | undefined>(undefined);
+
+  // Same clay recipe as the question cards, but with softer blur/offset and
+  // lower opacity so the photo doesn't compete with the cards for depth.
+  const imageClayShadow =
+    "8px 8px 18px rgba(45,30,10,0.14), inset -4px -4px 10px rgba(255,255,255,0.25)";
+
+  // White pill sitting behind the progress bar — same clay recipe as the
+  // pink/yellow cards (outer drop shadow + a bold inset shadow for volume),
+  // recolored gray since the pill has no border hue to draw an inset from.
+  const progressPillClayShadow =
+    "10px 10px 22px rgba(40,40,40,0.15), inset -7px -7px 14px rgba(120,120,120,0.45)";
+
+  // Same recipe applied to the green fill itself — inset only, since the
+  // track clips overflow and an outer drop shadow would just be cut off.
+  const progressFillClayShadow =
+    "inset -6px -6px 12px rgba(140,160,20,0.35)";
 
   const progress = session.progress;
   const currentNum = Math.min(progress.answered + 1, progress.total);
@@ -125,7 +138,6 @@ export default function SessionScreen({
       }
 
       setIsRecording(true);
-      setYellowPressed(true);
       // Capture how long the user waited before speaking
       initiationLatencyMsRef.current = Date.now() - questionShownAtRef.current;
       
@@ -146,7 +158,6 @@ export default function SessionScreen({
     const recordingDurationMs = recordingRef.current._finalDurationMillis || 0; // rough duration
     
     setIsRecording(false);
-    setYellowPressed(false);
     stopMetering();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -221,7 +232,6 @@ export default function SessionScreen({
   }
 
   function handleNext() {
-    setBurstCount((n) => n + 1);
     questionShownAtRef.current = Date.now();
     initiationLatencyMsRef.current = undefined;
     setHeardText("");
@@ -251,28 +261,24 @@ export default function SessionScreen({
 
   const topPad = Platform.OS === "ios" ? 58 : 20;
   const bodyHeight = height - topPad - 20 - 52 - 20;
-  const imageWidth = isPortrait ? undefined : bodyHeight * (16 / 10);
+  const imageWidth = isPortrait ? undefined : bodyHeight * (9 / 10);
 
   return (
     <View style={styles.container}>
       {/* ─── Top Bar ─── */}
       <View style={styles.topBar}>
-        <Image
-          source={require("../../assets/adiologo2.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <View style={styles.logoSpacer} />
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${pct}%` }]} />
-          <View style={styles.progressInner}>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.progressText}>
-              {currentNum}/{progress.total}
-            </Text>
+        <View style={[styles.progressPillWrap, { boxShadow: progressPillClayShadow } as any]}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${pct}%`, boxShadow: progressFillClayShadow } as any]} />
+            <View style={styles.progressInner}>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.progressText}>
+                {currentNum}/{progress.total}
+              </Text>
+            </View>
           </View>
         </View>
-        <TouchableOpacity onPress={handleClose} hitSlop={12}>
+        <TouchableOpacity onPress={handleClose} hitSlop={12} style={styles.closeBtnWrap}>
           <Text style={styles.closeBtn}>×</Text>
         </TouchableOpacity>
       </View>
@@ -280,16 +286,18 @@ export default function SessionScreen({
       {/* ─── Body ─── */}
       {isPortrait ? (
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.bodyVertical}
+          style={{ flex: 1, overflow: "visible" }}
+          contentContainerStyle={[styles.bodyVertical, { overflow: "visible" }]}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.imageWrapPortrait}>
-            <Image
-              source={{ uri: imageUrl(session.image_url) }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+          <View style={[styles.imageShadowPortrait, { boxShadow: imageClayShadow } as any]}>
+            <View style={styles.imageWrapPortrait}>
+              <Image
+                source={{ uri: imageUrl(session.image_url) }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            </View>
           </View>
           <View style={styles.sidebarWrapPortrait}>
             <View style={styles.sidebarInner}>
@@ -302,7 +310,6 @@ export default function SessionScreen({
                   heardText={heardText}
                   adioComment={adioComment}
                   onToggle={toggleRecording}
-                  pressed={yellowPressed}
                   onMicLayout={setMicCenter}
                 />
               ) : (
@@ -313,12 +320,14 @@ export default function SessionScreen({
         </ScrollView>
       ) : (
         <View style={styles.bodyLandscape}>
-          <View style={[styles.imageWrapLandscape, { width: imageWidth }]}>
-            <Image
-              source={{ uri: imageUrl(session.image_url) }}
-              style={styles.imageLandscape}
-              resizeMode="cover"
-            />
+          <View style={[styles.imageShadowLandscape, { width: imageWidth, boxShadow: imageClayShadow } as any]}>
+            <View style={styles.imageWrapLandscape}>
+              <Image
+                source={{ uri: imageUrl(session.image_url) }}
+                style={styles.imageLandscape}
+                resizeMode="cover"
+              />
+            </View>
           </View>
           <View style={styles.sidebarWrapLandscape}>
             <View style={styles.sidebarInner}>
@@ -331,7 +340,6 @@ export default function SessionScreen({
                   heardText={heardText}
                   adioComment={adioComment}
                   onToggle={toggleRecording}
-                  pressed={yellowPressed}
                   onMicLayout={setMicCenter}
                 />
               ) : (
@@ -358,7 +366,6 @@ function QuestionCard({
   heardText,
   adioComment,
   onToggle,
-  pressed,
   onMicLayout,
 }: {
   question: Question | null;
@@ -368,31 +375,21 @@ function QuestionCard({
   heardText?: string;
   adioComment?: string;
   onToggle: () => void;
-  pressed: boolean;
   onMicLayout?: (center: { x: number; y: number }) => void;
 }) {
   const micRef = useRef<View>(null);
-  const pressAnim = useRef(new Animated.Value(pressed ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(pressAnim, {
-      toValue: pressed ? 1 : 0,
-      duration: 150,
-      easing: Easing.inOut(Easing.sin),
-      useNativeDriver: false,
-    }).start();
-  }, [pressed]);
+  const [micPressed, setMicPressed] = useState(false);
 
   if (!question) return null;
 
   const label = isProcessing
-    ? processingStep === "transcribing" ? "I heard you, I'm working on it!"
-    : processingStep === "evaluating"  ? "I heard you, I'm working on it!"
+    ? processingStep === "transcribing" ? "Working on it!"
+    : processingStep === "evaluating"  ? "Working on it!"
     : processingStep === "speaking"    ? "Adio says:"
     : "Processing…"
     : isRecording
-    ? "Listening… tap to stop"
-    : "Tap to Answer";
+    ? "Tap to stop"
+    : "Tap to speak";
 
   const handleMicLayout = () => {
     if (micRef.current && onMicLayout) {
@@ -404,176 +401,150 @@ function QuestionCard({
     }
   };
 
-  // On web, use CSS transition with cubic-bezier approximating sine ease
-  const webTransitionStyle = Platform.OS === "web" ? {
-    transition: "transform 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95), box-shadow 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95)",
-    boxShadow: pressed
-      ? `0px 0px 0px ${colors.yellowBorder}`
-      : `0px 10px 0px ${colors.yellowBorder}`,
-    transform: pressed ? "translateY(10px)" : "translateY(0px)",
-  } as any : undefined;
+  // Outer pink card — claymorphic sculpt using a brighter, more vivid red
+  // instead of a near-black maroon, for a punchier, more playful feel.
+  const pinkClayShadow =
+    "18px 18px 55px rgba(120,10,40,0.29), inset -12px -12px 34px rgba(255,45,110,0.6)";
 
-  // On native, use the Animated values
-  const nativeAnimStyle = Platform.OS !== "web" ? {
-    transform: [
-      {
-        translateY: pressAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 10],
-        }),
-      },
-    ],
-    shadowOffset: {
-      width: 0,
-      height: pressAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [10, 0],
-      }) as unknown as number,
-    },
-    shadowOpacity: pressAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, 0],
-    }),
-    elevation: pressAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [6, 0],
-    }),
-  } : undefined;
+  // Inner yellow card — same recipe, scaled for the smaller surface.
+  // Hue-shifted toward a brighter, more vivid orange instead of a muddy brown.
+  const yellowClayShadow =
+    "10px 10px 34px rgba(140,60,0,0.27), inset -9px -9px 28px rgba(255,150,20,0.75)";
+
+  const clayTransition = Platform.OS === "web"
+    ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
+    : undefined;
 
   return (
-    <View style={qStyles.pinkCard}>
-      <Text style={qStyles.questionText}>{question.text}</Text>
-      <Animated.View
-        style={[
-          qStyles.yellowCard,
-          Platform.OS === "web" ? qStyles.yellowCardNoShadow : undefined,
-          nativeAnimStyle,
-          webTransitionStyle,
-        ]}
-      >
-        <TouchableOpacity
-          onPress={onToggle}
-          disabled={isProcessing}
-          activeOpacity={0.7}
-          style={qStyles.micBtn}
+    <View style={qStyles.wrapper}>
+      <View style={[qStyles.pinkCard, { boxShadow: pinkClayShadow } as any]}>
+        <View style={qStyles.questionTextWrap}>
+          <Text style={qStyles.questionText}>{question.text}</Text>
+        </View>
+        <View
+          style={[qStyles.yellowInner, { boxShadow: yellowClayShadow } as any, clayTransition]}
         >
-          <View
-            ref={micRef}
-            style={qStyles.micWrap}
-            onLayout={handleMicLayout}
+          <Pressable
+            onPress={onToggle}
+            disabled={isProcessing}
+            onPressIn={() => setMicPressed(true)}
+            onPressOut={() => setMicPressed(false)}
+            style={qStyles.micBtn}
           >
-            {isProcessing ? (
-              <Image
-                source={require("../../assets/spinner.gif")}
-                style={{ width: 150, height: 150 }}
-                resizeMode="contain"
-              />
-            ) : (
-              <Image
-                source={require("../../assets/micV3.png")}
-                style={qStyles.micImage}
-                resizeMode="contain"
-              />
+            <View
+              ref={micRef}
+              style={[
+                qStyles.micWrap,
+                { transform: [{ translateY: micPressed ? 2 : 0 }] },
+                clayTransition,
+              ]}
+              onLayout={handleMicLayout}
+            >
+              {isProcessing ? (
+                <Image
+                  source={require("../../assets/spinner.gif")}
+                  style={qStyles.micImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Image
+                  source={require("../../assets/micV3.png")}
+                  style={qStyles.micImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </Pressable>
+          <View style={qStyles.micTextCol}>
+            {!!label && <Text style={qStyles.micLabel}>{label}</Text>}
+            {!!heardText && processingStep !== "speaking" && (
+              <Text style={qStyles.heardText}>"{heardText}"</Text>
+            )}
+            {!!adioComment && processingStep === "speaking" && (
+              <Text style={qStyles.adioText}>{adioComment}</Text>
             )}
           </View>
-        </TouchableOpacity>
-        <Text style={qStyles.micLabel}>{label}</Text>
-        {!!heardText && processingStep !== "speaking" && (
-          <Text style={qStyles.heardText}>"{heardText}"</Text>
-        )}
-        {!!adioComment && processingStep === "speaking" && (
-          <Text style={qStyles.adioText}>{adioComment}</Text>
-        )}
-      </Animated.View>
+        </View>
+      </View>
     </View>
   );
 }
 
 const qStyles = StyleSheet.create({
+  wrapper: {
+    paddingTop: 0,
+    paddingBottom: 20,
+    paddingHorizontal: 0,
+    alignItems: "center",
+  },
   pinkCard: {
-    backgroundColor: colors.pinkCard,
-    borderWidth: 5,
-    borderColor: colors.pinkBorder,
+    backgroundColor: "#FFDDEB",
     borderRadius: 30,
-    paddingTop: 20,
-    paddingBottom: 14,
-    paddingHorizontal: 12,
-    shadowColor: colors.pinkBorder,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    padding: 20,
+    gap: 20,
+    alignItems: "center",
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  questionTextWrap: {
+    minHeight: 80,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
   },
   questionText: {
-    fontFamily: fonts.heading,
-    fontSize: 32,
+    fontFamily: fonts.fredoka,
+    fontSize: 26,
     color: colors.darkBlue,
     textAlign: "center",
-    lineHeight: 42,
-    marginBottom: 14,
+    lineHeight: 30,
   },
-  yellowCard: {
-    backgroundColor: colors.yellowCard,
-    borderWidth: 5,
-    borderColor: colors.yellowBorder,
-    borderRadius: 26,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+  yellowInner: {
+    backgroundColor: "#FFF0A8",
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 44,
+    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    shadowColor: colors.yellowBorder,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
-  },
-  yellowCardPressed: {
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    transform: [{ translateY: 10 }],
-    elevation: 0,
-  },
-  yellowCardNoShadow: {
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    gap: 16,
+    alignSelf: "stretch",
   },
   micBtn: { alignItems: "center" },
   micWrap: {
-    width: 150,
-    height: 150,
+    width: 100,
+    height: 100,
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
   },
   micImage: {
-    width: 150,
-    height: 150,
+    width: 100,
+    height: 100,
+  },
+  micTextCol: {
+    flex: 1,
+    alignItems: "flex-end",
+    gap: 4,
   },
   micLabel: {
     fontFamily: fonts.bodySemiBold,
-    fontSize: 24,
+    fontSize: 19,
     color: colors.darkBlue,
-    textAlign: "center",
+    textAlign: "right",
   },
   heardText: {
     fontFamily: fonts.body,
-    fontSize: 18,
+    fontSize: 14,
     color: colors.darkBlue,
-    textAlign: "center",
+    textAlign: "right",
     fontStyle: "italic",
-    marginTop: 8,
-    paddingHorizontal: 4,
   },
   adioText: {
     fontFamily: fonts.body,
-    fontSize: 18,
+    fontSize: 14,
     color: colors.darkBlue,
-    textAlign: "center",
-    lineHeight: 26,
-    marginTop: 6,
-    paddingHorizontal: 4,
+    textAlign: "right",
+    lineHeight: 21,
   },
 });
 
@@ -587,13 +558,21 @@ function FeedbackCard({ data, onNext }: { data: any; onNext: () => void }) {
   const heading = HEADING_MAP[score] || "Good Effort!";
   const comment = data?.followup || ev.feedback || "";
 
+  // Same clay recipe as the question cards — outer drop shadow + a bold
+  // inset shadow, brightened toward a vivid sky blue instead of dark navy.
+  const blueClayShadow =
+    "18px 18px 55px rgba(10,70,130,0.29), inset -12px -12px 34px rgba(50,180,240,0.65)";
+  // Brightened toward a vivid lime green instead of a muddy dark olive.
+  const greenClayShadow =
+    "10px 10px 34px rgba(90,120,0,0.27), inset -9px -9px 28px rgba(170,210,20,0.8)";
+
   return (
-    <View style={fStyles.blueCard}>
+    <View style={[fStyles.blueCard, { boxShadow: blueClayShadow } as any]}>
       <Text style={fStyles.heading}>{heading}</Text>
-      <Stars score={score} size={40} />
+      <Stars score={score} size={32} />
       <Text style={fStyles.comment}>{comment}</Text>
       <TouchableOpacity
-        style={fStyles.nextBtn}
+        style={[fStyles.nextBtn, { boxShadow: greenClayShadow } as any]}
         onPress={onNext}
         activeOpacity={0.7}
       >
@@ -606,48 +585,38 @@ function FeedbackCard({ data, onNext }: { data: any; onNext: () => void }) {
 const fStyles = StyleSheet.create({
   blueCard: {
     backgroundColor: colors.blueCard,
-    borderWidth: 5,
-    borderColor: colors.blueBorder,
     borderRadius: 30,
     padding: 24,
     alignItems: "center",
-    shadowColor: colors.blueBorder,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    alignSelf: "stretch",
+    width: "100%",
   },
   heading: {
-    fontFamily: fonts.heading,
-    fontSize: 44,
+    fontFamily: fonts.fredoka,
+    fontSize: 36,
     color: colors.darkBlueText,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   comment: {
     fontFamily: fonts.body,
-    fontSize: 22,
+    fontSize: 18,
     color: colors.darkBlueText,
     textAlign: "center",
-    lineHeight: 32,
-    marginVertical: 16,
+    lineHeight: 25,
+    marginVertical: 14,
+    width: "100%",
+    alignSelf: "stretch",
   },
   nextBtn: {
     backgroundColor: colors.greenBtn,
-    borderWidth: 5,
-    borderColor: colors.greenBorder,
-    borderRadius: 999,
-    paddingVertical: 14,
+    borderRadius: 20,
+    paddingVertical: 12,
     width: "80%",
     alignItems: "center",
-    shadowColor: colors.greenBorder,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
   },
   nextText: {
-    fontFamily: fonts.heading,
-    fontSize: 30,
+    fontFamily: fonts.fredoka,
+    fontSize: 26,
     color: colors.black,
   },
 });
@@ -669,7 +638,7 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 4,
     height: 52,
     marginBottom: 20,
     position: "relative" as const,
@@ -685,9 +654,15 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   logoSpacer: { width: 160, flexShrink: 0 },
+  progressPillWrap: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    padding: 10,
+  },
   progressTrack: {
     flex: 1,
-    height: 52,
+    height: 28,
     backgroundColor: colors.darkBlue,
     borderRadius: 999,
     overflow: "hidden",
@@ -708,29 +683,39 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   progressText: {
-    fontFamily: fonts.heading,
-    fontSize: 26,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
     color: colors.white,
+  },
+  closeBtnWrap: {
+    height: 48,
+    width: 32,
+    alignItems: "flex-end",
+    justifyContent: "center",
   },
   closeBtn: {
     fontFamily: fonts.heading,
-    fontSize: 52,
+    fontSize: 40,
     color: colors.darkBlue,
-    lineHeight: 52,
+    lineHeight: 40,
   },
 
   /* Body — landscape (side by side) */
   bodyLandscape: {
     flex: 1,
     flexDirection: "row",
-    gap: 16,
+    gap: 20,
+  },
+  imageShadowLandscape: {
+    borderRadius: 30,
+    backgroundColor: colors.bg,
+    alignSelf: "stretch",
   },
   imageWrapLandscape: {
+    flex: 1,
     borderRadius: 30,
     overflow: "hidden" as const,
     alignSelf: "stretch",
-    borderWidth: 5,
-    borderColor: "#002250",
   },
   imageLandscape: {
     width: "100%",
@@ -750,22 +735,25 @@ const styles = StyleSheet.create({
 
   /* Body — portrait (stacked) */
   bodyVertical: {
-    gap: 14,
+    gap: 20,
     paddingBottom: 20,
   },
-  imageWrapPortrait: {
+  imageShadowPortrait: {
     width: "100%",
-    aspectRatio: 16 / 10,
+    aspectRatio: 9 / 10,
+    borderRadius: 24,
+    backgroundColor: colors.bg,
+  },
+  imageWrapPortrait: {
+    flex: 1,
     borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 5,
-    borderColor: "#002250",
   },
   sidebarWrapPortrait: {
     width: "100%",
     position: "relative" as const,
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 0,
   },
 
   image: {

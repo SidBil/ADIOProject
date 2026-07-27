@@ -69,17 +69,25 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
   const btnFontSz     = Math.max(20, Math.min(30, winH * 0.036));
   const hintSz        = Math.max(13, Math.min(16, winH * 0.02));
 
-  const beginWebStyle = Platform.OS === "web" ? ({
-    transition: "transform 150ms ease, box-shadow 150ms ease",
-    boxShadow: beginPressed ? `0px 0px 0px ${colors.yellowBorder}` : `0px ${cardBorder}px 0px ${colors.yellowBorder}`,
-    transform: beginPressed ? `translateY(${cardBorder}px)` : "translateY(0px)",
-  } as any) : undefined;
+  /* ── Claymorphism shadow recipes ──
+     Layer stack (matches the CSS example the user shared):
+       1. outer drop  — soft black, gives the puffy floating feel
+       2. inset bottom-right — an "adjacent" warm color for the yellow / blue for the blue,
+          which sculpts the 3D rounded-clay look
+       3. inset top highlight — pure white, mimics a glossy top edge catching light  */
+  // Inset colors are only ~1 shade deeper than each button's base card color,
+  // so the sculpt reads as "same clay, slightly in shadow" instead of a contrasting outline.
+  const beginClayShadow = beginPressed
+    ? "10px 10px 26px rgba(0,0,0,0.14), inset -4px -4px 14px rgba(245,158,11,0.55)"
+    : "26px 26px 50px rgba(0,0,0,0.2), inset -12px -12px 22px rgba(245,158,11,0.6)";
 
-  const historyWebStyle = Platform.OS === "web" ? ({
-    transition: "transform 150ms ease, box-shadow 150ms ease",
-    boxShadow: historyPressed ? `0px 0px 0px ${colors.blueBorder}` : `0px ${cardBorder}px 0px ${colors.blueBorder}`,
-    transform: historyPressed ? `translateY(${cardBorder}px)` : "translateY(0px)",
-  } as any) : undefined;
+  const historyClayShadow = historyPressed
+    ? "10px 10px 26px rgba(0,0,0,0.14), inset -4px -4px 14px rgba(41,165,225,0.5)"
+    : "26px 26px 50px rgba(0,0,0,0.2), inset -12px -12px 22px rgba(41,165,225,0.55)";
+
+  const clayTransition = Platform.OS === "web"
+    ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
+    : undefined;
 
   return (
     <View style={[styles.container, { width: winW, height: winH }]}>
@@ -119,21 +127,13 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
             style={[
               styles.beginBtn,
               {
-                borderWidth: cardBorder,
-                borderRadius: 999,
-                paddingVertical: pad,
-                paddingHorizontal: pad * 3,
+                borderRadius: Math.max(22, Math.min(34, winH * 0.038)),
+                paddingVertical: pad * 1.15,
+                paddingHorizontal: pad * 3.2,
+                boxShadow: beginClayShadow,
+                transform: [{ translateY: beginPressed ? 3 : 0 }],
               },
-              Platform.OS === "web"
-                ? { shadowOpacity: 0, elevation: 0 }
-                : {
-                    shadowColor: colors.yellowBorder,
-                    shadowOffset: { width: 0, height: cardBorder },
-                    shadowOpacity: 1,
-                    shadowRadius: 0,
-                    elevation: 4,
-                  },
-              beginWebStyle,
+              clayTransition,
             ]}
           >
             {loading ? (
@@ -156,21 +156,13 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
               style={[
                 styles.historyBtn,
                 {
-                  borderWidth: cardBorder,
-                  borderRadius: 999,
-                  paddingVertical: pad * 0.8,
-                  paddingHorizontal: pad * 2.4,
+                  borderRadius: Math.max(18, Math.min(28, winH * 0.032)),
+                  paddingVertical: pad * 0.95,
+                  paddingHorizontal: pad * 2.6,
+                  boxShadow: historyClayShadow,
+                  transform: [{ translateY: historyPressed ? 3 : 0 }],
                 },
-                Platform.OS === "web"
-                  ? { shadowOpacity: 0, elevation: 0 }
-                  : {
-                      shadowColor: colors.blueBorder,
-                      shadowOffset: { width: 0, height: cardBorder },
-                      shadowOpacity: 1,
-                      shadowRadius: 0,
-                      elevation: 4,
-                    },
-                historyWebStyle,
+                clayTransition,
               ]}
             >
               <Text style={[styles.historyBtnText, { fontSize: btnFontSz * 0.75 }]}>

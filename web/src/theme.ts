@@ -18,7 +18,7 @@ export const colors = {
   greenBtn: "#F3FFAD",
   greenBorder: "#BCD533",
 
-  progressFill: "#BFD62C",
+  progressFill: "#D6EA3E",
 
   starPink: "#F71D73",
   starDark: "#001543",
@@ -33,4 +33,5 @@ export const fonts = {
   body: "Inter_400Regular",
   bodyMedium: "Inter_500Medium",
   bodySemiBold: "Inter_600SemiBold",
+  fredoka: "Fredoka_600SemiBold",
 } as const;

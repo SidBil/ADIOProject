@@ -1,0 +1,27 @@
+{
+  "model": "openai/clip-vit-base-patch32",
+  "num_images": 20,
+  "image_files": [
+    "img_001.png",
+    "img_002.png",
+    "img_003.png",
+    "img_004.png",
+    "img_005.png",
+    "img_006.png",
+    "img_007.png",
+    "img_008.png",
+    "img_009.png",
+    "img_010.png",
+    "img_011.png",
+    "img_012.png",
+    "img_013.png",
+    "img_014.png",
+    "img_015.png",
+    "img_016.png",
+    "img_017.png",
+    "img_018.png",
+    "img_019.png",
+    "img_020.png"
+  ],
+  "embedding_dim": 512
+}

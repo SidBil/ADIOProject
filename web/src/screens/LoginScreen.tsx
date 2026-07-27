@@ -13,6 +13,8 @@ import {
   Easing,
   Pressable,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { colors, fonts } from "../theme";
 import { supabase } from "../lib/supabase";
 import { track } from "../lib/analytics";
@@ -82,17 +84,53 @@ export default function LoginScreen({ onAuth }: Props) {
     setLoading(true);
     setError(null);
     track("auth_started", { method: "google" });
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+
+    if (Platform.OS === "web") {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+      setLoading(false);
+      if (oauthError) {
+        setError(oauthError.message);
+        track("app_error", { area: "auth", error_code: oauthError.code });
+      }
+      return;
+    }
+
+    // iOS/Android: open Google OAuth in an in-app browser and handle deep link callback
+    const redirectTo = Linking.createURL("/");
+    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: Platform.OS === "web" ? window.location.origin : undefined,
-      },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
+
+    if (oauthError || !data?.url) {
+      setLoading(false);
+      setError(oauthError?.message ?? "Could not start Google sign-in.");
+      track("app_error", { area: "auth", error_code: oauthError?.code });
+      return;
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
     setLoading(false);
-    if (oauthError) {
-      setError(oauthError.message);
-      track("app_error", { area: "auth", error_code: oauthError.code });
-    } else {
+
+    if (result.type === "success") {
+      // Implicit flow returns tokens in the hash fragment: adio-therapy:///#access_token=...
+      const hash = result.url.split("#")[1] ?? "";
+      const params = Object.fromEntries(new URLSearchParams(hash));
+      const accessToken = params.access_token;
+      const refreshToken = params.refresh_token;
+      if (!accessToken || !refreshToken) {
+        setError("Sign-in failed: no tokens returned.");
+        return;
+      }
+      const { error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      if (sessionError) {
+        setError(sessionError.message);
+        track("app_error", { area: "auth", error_code: sessionError.code });
+        return;
+      }
       track("auth_completed", { method: "google", success: true });
     }
   }

@@ -1,21 +1,19 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  ActivityIndicator,
   Image,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  Animated,
-  Easing,
   Pressable,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { colors, fonts } from "../theme";
+import Spinner from "../components/Spinner";
 import { supabase } from "../lib/supabase";
 import { track } from "../lib/analytics";
 
@@ -153,7 +151,7 @@ export default function LoginScreen({ onAuth }: Props) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
+        <View style={styles.content}>
           <Image
             source={require("../../assets/adiologo2.png")}
             style={styles.logo}
@@ -184,12 +182,12 @@ export default function LoginScreen({ onAuth }: Props) {
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <Button3D
+          <ClayButton
             title={isSignUp ? "Sign Up" : "Sign In"}
             onPress={handleEmailAuth}
             loading={loading}
             topColor={colors.blueCard}
-            bottomColor={colors.blueBorder}
+            accent="41,165,225"
             textColor={colors.darkBlue}
           />
 
@@ -219,12 +217,12 @@ export default function LoginScreen({ onAuth }: Props) {
             <View style={styles.dividerLine} />
           </View>
 
-          <Button3D
+          <ClayButton
             title="Sign in with Google"
             onPress={handleGoogleAuth}
             loading={loading}
             topColor={colors.greenBtn}
-            bottomColor={colors.greenBorder}
+            accent="188,213,51"
             textColor={colors.darkBlue}
           />
 
@@ -256,20 +254,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  card: {
-    backgroundColor: colors.cardWhite,
-    borderRadius: 28,
-    padding: 36,
+  content: {
     width: "100%",
     maxWidth: 420,
     alignItems: "center",
-    borderWidth: 5,
-    borderColor: "#d8d8d8",
-    shadowColor: "#d8d8d8",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    paddingHorizontal: 8,
   },
   logo: { 
     height: 180, 
@@ -360,50 +349,33 @@ const styles = StyleSheet.create({
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   Button3D component to mimic the 3D card layout from SessionScreen
+   Claymorphic button — outer drop shadow + a brighter inset sculpt in the
+   button's own accent colour, presses in on tap. `accent` is an "r,g,b" string.
    ═══════════════════════════════════════════════════════════════ */
 
-function Button3D({ 
-  title, 
-  onPress, 
-  topColor, 
-  bottomColor, 
-  textColor, 
+function ClayButton({
+  title,
+  onPress,
+  topColor,
+  accent,
+  textColor,
   loading,
 }: {
   title: string;
   onPress: (e: any) => void;
   topColor: string;
-  bottomColor: string;
+  accent: string;
   textColor: string;
   loading: boolean;
 }) {
   const [pressed, setPressed] = useState(false);
-  const pressAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(pressAnim, {
-      toValue: pressed ? 1 : 0,
-      duration: 150,
-      easing: Easing.inOut(Easing.sin),
-      useNativeDriver: false,
-    }).start();
-  }, [pressed]);
-
-  const webTransitionStyle = Platform.OS === "web" ? {
-    transition: "transform 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95), box-shadow 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95)",
-    boxShadow: pressed
-      ? `0px 0px 0px ${bottomColor}`
-      : `0px 8px 0px ${bottomColor}`,
-    transform: pressed ? "translateY(8px)" : "translateY(0px)",
-  } as any : undefined;
-
-  const nativeAnimStyle = Platform.OS !== "web" ? {
-    transform: [{ translateY: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) }],
-    shadowOffset: { width: 0, height: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) as unknown as number },
-    shadowOpacity: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-    elevation: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }),
-  } : undefined;
+  const clayShadow = pressed
+    ? `4px 4px 14px rgba(0,0,0,0.12), inset -5px -5px 14px rgba(${accent},0.85)`
+    : `9px 9px 28px rgba(0,0,0,0.15), inset -8px -8px 24px rgba(${accent},0.7)`;
+  const clayTransition =
+    Platform.OS === "web"
+      ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
+      : undefined;
 
   return (
     <Pressable
@@ -412,37 +384,29 @@ function Button3D({
       }}
       onPressIn={() => !loading && setPressed(true)}
       onPressOut={() => setPressed(false)}
-      style={{ width: "100%", marginTop: 4, marginBottom: 4 }}
+      style={{ width: "100%", marginTop: 6, marginBottom: 6 }}
     >
-      <Animated.View
+      <View
         style={[
           {
             backgroundColor: topColor,
-            borderWidth: 4,
-            borderColor: bottomColor,
             borderRadius: 999,
             paddingVertical: 16,
             alignItems: "center",
-            shadowColor: bottomColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 1,
-            shadowRadius: 0,
-          },
-          Platform.OS === "web" 
-            ? { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, elevation: 0 } 
-            : undefined,
-          nativeAnimStyle,
-          webTransitionStyle,
+            boxShadow: clayShadow,
+            transform: [{ translateY: pressed ? 3 : 0 }],
+          } as any,
+          clayTransition,
         ]}
       >
         {loading ? (
-          <ActivityIndicator color={textColor} />
+          <Spinner size="small" />
         ) : (
           <Text style={{ fontFamily: fonts.heading, fontSize: 20, color: textColor }}>
             {title}
           </Text>
         )}
-      </Animated.View>
+      </View>
     </Pressable>
   );
 }

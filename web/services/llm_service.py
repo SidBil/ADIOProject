@@ -17,6 +17,28 @@ WEB_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(WEB_ROOT / ".env")
 
 
+# Appended to the prompts in Stage 2 (recall) sessions, where the image is hidden
+# and the child answers from memory. Forgetting is expected, not a failure, and the
+# LLM must never tell the child to look at an image that isn't there.
+RECALL_EVAL_NOTE = """
+
+--- RECALL MODE (this session) ---
+The child is answering from MEMORY. The image has been HIDDEN — they can no longer see it.
+- Do NOT reference looking at, seeing, observing, or noticing anything "in the picture" — it is gone.
+- Forgetting a detail is EXPECTED and normal in recall; it is NOT a comprehension failure. Do not lower
+  scores merely because a detail was omitted from memory — credit what the child DID remember.
+- Keep feedback warm and normalizing (praise what they recalled; never imply they failed for forgetting)."""
+
+RECALL_FOLLOWUP_NOTE = """
+
+--- RECALL MODE (this session) ---
+The child is recalling from MEMORY — the image is HIDDEN and they cannot look at it.
+- The "suggested_question" MUST be a gentle MEMORY JOG phrased as remembering (e.g. "Do you remember what
+  color the cat was?"). NEVER say "look at", "take another look", "observe", or "notice in the picture".
+- The "comment" must warmly normalize forgetting (e.g. "That's okay — it can be tricky to remember everything!").
+- Ask for ONE small remembered detail; never pressure. If they don't remember, that is completely fine."""
+
+
 class LLMService:
     def __init__(self, model: str = "gpt-4o"):
         self.model = model
@@ -52,7 +74,8 @@ class LLMService:
 
     def evaluate_response(self, question: str, expected_answer: str,
                           transcription: str, structure_word: str,
-                          entities: str = "", actions: str = "") -> dict:
+                          entities: str = "", actions: str = "",
+                          mode: str = "stage1") -> dict:
         """Evaluate a child's response against the expected answer."""
         system = """You are a warm, encouraging speech-language pathologist evaluating
 a child's verbal response during a V/V therapy session. The child was shown an image
@@ -68,7 +91,10 @@ IMPORTANT CONSTRAINTS:
 - The ASR transcription will have NO capitalization and NO punctuation. It may also
   contain minor transcription errors (e.g. "bare" instead of "bear", "there" instead
   of "their"). Be forgiving of these — evaluate the meaning, not the surface text.
-- Keep feedback to exactly 1-2 sentences. Be warm and encouraging.
+- Keep feedback to exactly ONE short sentence. Be warm and encouraging.
+- Your feedback must NOT contain a question. Do not ask the child anything, and do not
+  prompt them for more detail — this is pure acknowledgment/encouragement of what they
+  already said. (Follow-up questions are handled separately, elsewhere in the app.)
 
 CRITICAL — HANDLING OPEN-ENDED QUESTIONS:
 - The "expected answer" is ONE POSSIBLE correct response, NOT the only valid answer.
@@ -109,7 +135,7 @@ Expected: "The umbrella is bright red."
 Entities: child; umbrella; rain
 Child said: "its red"
 Result:
-{"scores":{"accuracy":5,"detail":3,"clarity":4,"relevance":5},"feedback":"Great job! You noticed the red umbrella! Can you tell me more about it — is it big or small?","identified_elements":["red","umbrella"],"missed_elements":["bright"],"overall_score":4}
+{"scores":{"accuracy":5,"detail":3,"clarity":4,"relevance":5},"feedback":"Great job noticing the umbrella is red!","identified_elements":["red","umbrella"],"missed_elements":["bright"],"overall_score":4}
 
 Example 2 (open-ended question — accept reasonable answers):
 Question: "If you were in this scene, what sounds might you hear?"
@@ -117,7 +143,7 @@ Expected: "quiet park sounds"
 Entities: robot; flower; bench
 Child said: "um maybe birds and like wind blowing"
 Result:
-{"scores":{"accuracy":5,"detail":4,"clarity":4,"relevance":5},"feedback":"I love that! Birds singing and wind blowing are great sounds you might hear in a park. What else might be quiet or peaceful there?","identified_elements":["birds","wind blowing"],"missed_elements":[],"overall_score":5}
+{"scores":{"accuracy":5,"detail":4,"clarity":4,"relevance":5},"feedback":"I love that — birds singing and wind blowing are great sounds you might hear in a park!","identified_elements":["birds","wind blowing"],"missed_elements":[],"overall_score":5}
 
 Example 3 (open-ended question — different but valid interpretation):
 Question: "What mood or feeling does this picture give you?"
@@ -125,7 +151,7 @@ Expected: "sad or thoughtful"
 Entities: boy; rain; window
 Child said: "its cozy because hes inside and its raining"
 Result:
-{"scores":{"accuracy":4,"detail":4,"clarity":5,"relevance":5},"feedback":"What a thoughtful answer! Being inside while it rains can definitely feel cozy. What about the boy's face — does he look happy or more thoughtful?","identified_elements":["inside","raining","cozy feeling"],"missed_elements":[],"overall_score":5}
+{"scores":{"accuracy":4,"detail":4,"clarity":5,"relevance":5},"feedback":"What a thoughtful answer — being inside while it rains can definitely feel cozy!","identified_elements":["inside","raining","cozy feeling"],"missed_elements":[],"overall_score":5}
 
 Example 4 (child gives unrelated answer):
 Question: "What is the dog doing?"
@@ -133,11 +159,14 @@ Expected: "The brown dog is running through the grass."
 Entities: dog; ball; trees; grass
 Child said: "the dog is like running i think"
 Result:
-{"scores":{"accuracy":4,"detail":2,"clarity":3,"relevance":5},"feedback":"Yes, the dog is running! What color is the dog, and where is it running?","identified_elements":["dog","running"],"missed_elements":["brown","through the grass"],"overall_score":3}
+{"scores":{"accuracy":4,"detail":2,"clarity":3,"relevance":5},"feedback":"Yes, the dog is running — nice job noticing that!","identified_elements":["dog","running"],"missed_elements":["brown","through the grass"],"overall_score":3}
 
 --- END EXAMPLES ---
 
 Do not include any text outside the JSON object."""
+
+        if mode == "stage2":
+            system += RECALL_EVAL_NOTE
 
         user = f"""Question asked: "{question}"
 Structure word focus: {structure_word}
@@ -156,10 +185,13 @@ Evaluate this response. Return ONLY the JSON object."""
 
     def generate_followup(self, question: str, transcription: str,
                           evaluation: dict, structure_word: str,
-                          entities: str = "", actions: str = "") -> dict:
-        """Generate a dynamic follow-up when accuracy < 4.
+                          entities: str = "", actions: str = "",
+                          mode: str = "stage1") -> dict:
+        """Generate a dynamic follow-up when accuracy is below the threshold.
 
         Returns dict with ``comment``, ``suggested_question``, ``structure_word``.
+        In Stage 2 (recall) this is phrased as a gentle memory jog, not a
+        "look again" prompt (the image is hidden).
         """
         system = """You are a warm speech therapist working with a child through a
 DIGITAL application. The child struggled with a question about an image.
@@ -175,10 +207,12 @@ IMPORTANT CONSTRAINTS:
 - For open-ended questions (mood, sound, movement), remember that the child's original
   answer may have been valid even if it differed from the expected answer. Focus on
   encouraging MORE detail, not correcting them toward one specific answer.
+- The "comment" must be exactly ONE short sentence (the follow-up question is a separate
+  field and does not count toward this).
 
 Generate a JSON object:
 {
-  "comment": "A warm 1-2 sentence encouragement for the child.",
+  "comment": "A warm, single-sentence encouragement for the child (exactly ONE sentence).",
   "suggested_question": "A simpler follow-up question the child can answer by speaking.",
   "structure_word": "The V/V structure word this question targets."
 }
@@ -190,25 +224,28 @@ Original question: "Describe what is happening in the picture."
 Child said: "um a dog"
 Score: 2/5
 Result:
-{"comment":"Good start! You noticed the dog! Let's look a little closer at what the dog is doing.","suggested_question":"What is the dog doing — is it sitting, running, or sleeping?","structure_word":"what"}
+{"comment":"Good start — you noticed the dog, now let's look a little closer!","suggested_question":"What is the dog doing — is it sitting, running, or sleeping?","structure_word":"what"}
 
 Example 2:
 Original question: "What color are the flowers?"
 Child said: "i dont know"
 Score: 1/5
 Result:
-{"comment":"That's okay! Let's try together. Take another look at the flowers in the picture.","suggested_question":"Do the flowers look more red, or more yellow?","structure_word":"color"}
+{"comment":"That's okay — let's take another look at the flowers together!","suggested_question":"Do the flowers look more red, or more yellow?","structure_word":"color"}
 
 Example 3:
 Original question: "What sounds might you hear in this scene?"
 Child said: "um loud"
 Score: 2/5
 Result:
-{"comment":"Interesting! You think it might be loud. Let's think about what could be making those sounds.","suggested_question":"What things in the picture might be making noise?","structure_word":"sound"}
+{"comment":"Interesting — let's think about what could be making those sounds!","suggested_question":"What things in the picture might be making noise?","structure_word":"sound"}
 
 --- END EXAMPLES ---
 
 Return ONLY valid JSON, no markdown or extra text."""
+
+        if mode == "stage2":
+            system += RECALL_FOLLOWUP_NOTE
 
         missed = evaluation.get("missed_elements", [])
         feedback = evaluation.get("feedback", "")

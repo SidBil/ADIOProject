@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
+  Platform,
   useWindowDimensions,
 } from "react-native";
 import { colors, fonts } from "../theme";

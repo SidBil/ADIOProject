@@ -5,7 +5,6 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
@@ -137,7 +136,14 @@ export default function WelcomeScreen({ onStart, onHistory, onSignOut }: Props) 
             ]}
           >
             {loading ? (
-              <Text style={[styles.beginBtnText, { fontSize: btnFontSz * 0.7 }]}>{loadingMsg}</Text>
+              <View style={styles.loadingRow}>
+                <Image
+                  source={require("../../assets/spinner.gif")}
+                  style={[styles.spinner, { width: btnFontSz, height: btnFontSz }]}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.beginBtnText, { fontSize: btnFontSz * 0.7 }]}>{loadingMsg}</Text>
+              </View>
             ) : (
               <Text style={[styles.beginBtnText, { fontSize: btnFontSz }]}>Begin a Session</Text>
             )}
@@ -232,6 +238,14 @@ const styles = StyleSheet.create({
   beginBtnText: {
     fontFamily: fonts.heading,
     color: colors.darkBlue,
+  },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  spinner: {
+    flexShrink: 0,
   },
 
   /* ── Secondary blue chunky button ── */

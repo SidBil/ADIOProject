@@ -9,6 +9,8 @@ import {
   Platform,
   Alert,
   ScrollView,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from "react-native";
 import { Audio } from "expo-av";
@@ -25,6 +27,10 @@ function showAlert(title: string, msg: string) {
     Alert.alert(title, msg);
   }
 }
+
+// How long a single peek reveals the real image before it auto-re-blurs. A peek
+// is a brief glance, not a hold-open toggle (01_recall_session.md §4).
+const PEEK_SECONDS = 3;
 
 const HEADING_MAP: Record<number, string> = {
   5: "Excellent!",
@@ -44,6 +50,9 @@ interface Question {
 interface SessionData {
   session_id: string;
   image_url: string;
+  // V&V condition for this session. "stage2" (recall) hides the image after a
+  // viewing phase; "stage1" (or absent) keeps it visible throughout.
+  mode?: "stage1" | "stage2";
   question: Question | null;
   total_questions: number;
   progress: { answered: number; total: number; completed: boolean };
@@ -51,7 +60,9 @@ interface SessionData {
 
 interface Props {
   session: SessionData;
-  onEnd: () => void;
+  // completed=true only when all questions (and follow-ups) resolved; the
+  // celebration screen is gated on this. An early quit passes false.
+  onEnd: (completed: boolean) => void;
   onUpdateSession: (patch: Partial<SessionData>) => void;
 }
 
@@ -78,6 +89,66 @@ export default function SessionScreen({
   const { volume, startMetering, stopMetering } = useVolumeMeter();
   const questionShownAtRef = useRef<number>(Date.now());
   const initiationLatencyMsRef = useRef<number | undefined>(undefined);
+  // Total time to answer: question shown -> answer submitted (recording stopped).
+  const answerDurationMsRef = useRef<number | undefined>(undefined);
+
+  // ─── Stage 2 (recall) state ───
+  // A Stage 2 session shows the image, then hides it (blurred) for the whole
+  // question set; the child answers from memory (01_recall_session.md §3).
+  const isStage2 = session.mode === "stage2";
+  // Flipped once, via the "ready" gate — a single hide event per session, not a
+  // per-question toggle. Stage 1 never hides.
+  const [imageHidden, setImageHidden] = useState(false);
+  // One free peek per session: reveals the real image once, logged but never
+  // scored, then re-blurs for the rest of the session (§4).
+  const [peekUsed, setPeekUsed] = useState(false);
+  const [peeking, setPeeking] = useState(false);
+  const [peekLeft, setPeekLeft] = useState(PEEK_SECONDS);
+
+  // The image reads as hidden only in Stage 2, after the ready gate, and while
+  // not mid-peek. Blur is applied via CSS filter on web and the Image
+  // `blurRadius` prop on native (§8 open question — MVP: both paths covered).
+  const blurred = isStage2 && imageHidden && !peeking;
+  // Heavy blur so no recallable detail survives (01_recall_session.md §3.4). The
+  // scale-up covers the transparent edge bleed the filter leaves at this radius.
+  const webBlurStyle =
+    Platform.OS === "web" && blurred
+      ? ({ filter: "blur(60px)", transform: [{ scale: 1.3 }] } as any)
+      : null;
+  const nativeBlurRadius = Platform.OS !== "web" && blurred ? 55 : 0;
+  // Before the ready gate is tapped, Stage 2 sits in a viewing phase: image at
+  // full visibility, no question card yet.
+  const showViewingGate = isStage2 && !imageHidden;
+
+  const startPeek = () => {
+    if (peekUsed || peeking) return;
+    setPeekLeft(PEEK_SECONDS);
+    setPeeking(true);
+    // Logged for instrumentation (which turn it was used on); does NOT affect
+    // the accuracy score (§4).
+    track("peek_used", {
+      question_index: session.progress.answered,
+      mode: session.mode,
+    });
+  };
+
+  // A peek is a timed glance: once started it counts down, then auto re-blurs
+  // and is spent — so it can't be held open as unlimited viewing.
+  useEffect(() => {
+    if (!peeking) return;
+    const end = setTimeout(() => {
+      setPeeking(false);
+      setPeekUsed(true);
+    }, PEEK_SECONDS * 1000);
+    const tick = setInterval(
+      () => setPeekLeft((s) => Math.max(0, s - 1)),
+      1000,
+    );
+    return () => {
+      clearTimeout(end);
+      clearInterval(tick);
+    };
+  }, [peeking]);
 
   // Same clay recipe as the question cards, but with softer blur/offset and
   // lower opacity so the photo doesn't compete with the cards for depth.
@@ -111,6 +182,15 @@ export default function SessionScreen({
     }
   }, [session.question?.id]);
 
+  // Read the question aloud when its card is shown (supports pre-readers and the
+  // reading-comprehension goal). Only while the question card is actually up — not
+  // during the feedback card, and not during the Stage 2 viewing gate.
+  useEffect(() => {
+    if (cardState === "question" && !showViewingGate && session.question?.text) {
+      speakTTS(session.question.text).catch(() => {});
+    }
+  }, [cardState, showViewingGate, session.question?.id]);
+
   async function startRecording() {
     try {
       const { granted } = await Audio.requestPermissionsAsync();
@@ -126,6 +206,16 @@ export default function SessionScreen({
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         startMetering(stream);
+      }
+
+      // expo-av permits only ONE prepared Recording at a time. Clear any leftover
+      // (e.g. from a fast re-tap or a prior cycle that errored before unloading)
+      // so createAsync can't throw "only one recording object can be prepared".
+      if (recordingRef.current) {
+        try {
+          await recordingRef.current.stopAndUnloadAsync();
+        } catch {}
+        recordingRef.current = null;
       }
 
       const { recording } = await Audio.Recording.createAsync(
@@ -153,10 +243,12 @@ export default function SessionScreen({
 
   async function stopRecording() {
     if (!recordingRef.current) return;
-    
+
     // Calculate how long they were speaking
     const recordingDurationMs = recordingRef.current._finalDurationMillis || 0; // rough duration
-    
+    // Total time to answer this question: question shown -> answer submitted.
+    answerDurationMsRef.current = Date.now() - questionShownAtRef.current;
+
     setIsRecording(false);
     stopMetering();
     if (streamRef.current) {
@@ -199,6 +291,7 @@ export default function SessionScreen({
         session.session_id,
         transcription,
         initiationLatencyMsRef.current,
+        answerDurationMsRef.current,
       );
       track("evaluation_completed", {
         latency_ms: eData.evaluation?.llm_latency_ms || 0,
@@ -234,15 +327,20 @@ export default function SessionScreen({
   function handleNext() {
     questionShownAtRef.current = Date.now();
     initiationLatencyMsRef.current = undefined;
+    answerDurationMsRef.current = undefined;
     setHeardText("");
     setAdioComment("");
     setProcessingStep(null);
     if (session.progress.completed || !session.question) {
-      track("session_completed", { 
+      track("session_completed", {
         questions_answered: session.progress.answered,
         total_questions: session.progress.total
       });
-      onEnd();
+      // Finalize the DB row (ended_at, completed=true, questions_answered) so the
+      // parent/SLP clinical view has accurate timing + status. Fire-and-forget:
+      // the celebration doesn't depend on it.
+      endSession(session.session_id).catch(() => {});
+      onEnd(true);
     } else {
       setCardState("question");
     }
@@ -256,7 +354,7 @@ export default function SessionScreen({
       });
       await endSession(session.session_id);
     } catch {}
-    onEnd();
+    onEnd(false);
   }
 
   const topPad = Platform.OS === "ios" ? 58 : 20;
@@ -284,7 +382,15 @@ export default function SessionScreen({
       </View>
 
       {/* ─── Body ─── */}
-      {isPortrait ? (
+      {showViewingGate ? (
+        <ViewingGate
+          uri={imageUrl(session.image_url)}
+          isPortrait={isPortrait}
+          imageWidth={imageWidth}
+          imageClayShadow={imageClayShadow}
+          onReady={() => setImageHidden(true)}
+        />
+      ) : isPortrait ? (
         <ScrollView
           style={{ flex: 1, overflow: "visible" }}
           contentContainerStyle={[styles.bodyVertical, { overflow: "visible" }]}
@@ -294,9 +400,18 @@ export default function SessionScreen({
             <View style={styles.imageWrapPortrait}>
               <Image
                 source={{ uri: imageUrl(session.image_url) }}
-                style={styles.image}
+                style={[styles.image, webBlurStyle]}
                 resizeMode="cover"
+                blurRadius={nativeBlurRadius}
               />
+              {isStage2 && imageHidden && (
+                <PeekOverlay
+                  peeking={peeking}
+                  peekUsed={peekUsed}
+                  peekLeft={peekLeft}
+                  onPeek={startPeek}
+                />
+              )}
             </View>
           </View>
           <View style={styles.sidebarWrapPortrait}>
@@ -324,9 +439,18 @@ export default function SessionScreen({
             <View style={styles.imageWrapLandscape}>
               <Image
                 source={{ uri: imageUrl(session.image_url) }}
-                style={styles.imageLandscape}
+                style={[styles.imageLandscape, webBlurStyle]}
                 resizeMode="cover"
+                blurRadius={nativeBlurRadius}
               />
+              {isStage2 && imageHidden && (
+                <PeekOverlay
+                  peeking={peeking}
+                  peekUsed={peekUsed}
+                  peekLeft={peekLeft}
+                  onPeek={startPeek}
+                />
+              )}
             </View>
           </View>
           <View style={styles.sidebarWrapLandscape}>
@@ -352,6 +476,203 @@ export default function SessionScreen({
     </View>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Stage 2 (recall) — viewing gate + peek overlay
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * The pre-question viewing phase for a Stage 2 (recall) session. The image is
+ * shown at full visibility with no minimum viewing time — the child views for as
+ * long as they want, then taps the "ready" control to hide it and start
+ * answering from memory (01_recall_session.md §3).
+ */
+function ViewingGate({
+  uri,
+  isPortrait,
+  imageWidth,
+  imageClayShadow,
+  onReady,
+}: {
+  uri: string;
+  isPortrait: boolean;
+  imageWidth?: number;
+  imageClayShadow: string;
+  onReady: () => void;
+}) {
+  const [pressed, setPressed] = useState(false);
+  const redClayShadow = pressed
+    ? "5px 5px 18px rgba(150,10,60,0.22), inset -5px -5px 16px rgba(247,29,115,0.8)"
+    : "10px 10px 34px rgba(150,10,60,0.27), inset -9px -9px 28px rgba(247,29,115,0.72)";
+  const clayTransition =
+    Platform.OS === "web"
+      ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
+      : undefined;
+
+  const readyCard = (
+    <View style={gateStyles.card}>
+      <Text style={gateStyles.title}>Look closely!</Text>
+      <Text style={gateStyles.subtitle}>
+        Remember the picture. When you're ready, we'll hide it and you'll tell me
+        about it from memory.
+      </Text>
+      <Pressable
+        onPress={onReady}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        accessibilityRole="button"
+        accessibilityLabel="I'm ready — hide the picture"
+        style={[
+          gateStyles.readyBtn,
+          { boxShadow: redClayShadow, transform: [{ translateY: pressed ? 3 : 0 }] } as any,
+          clayTransition,
+        ]}
+      >
+        <Text style={gateStyles.readyText}>I'm ready</Text>
+      </Pressable>
+    </View>
+  );
+
+  if (isPortrait) {
+    return (
+      <ScrollView
+        style={{ flex: 1, overflow: "visible" }}
+        contentContainerStyle={[styles.bodyVertical, { overflow: "visible" }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.imageShadowPortrait, { boxShadow: imageClayShadow } as any]}>
+          <View style={styles.imageWrapPortrait}>
+            <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+          </View>
+        </View>
+        <View style={styles.sidebarWrapPortrait}>
+          <View style={styles.sidebarInner}>{readyCard}</View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={styles.bodyLandscape}>
+      <View style={[styles.imageShadowLandscape, { width: imageWidth, boxShadow: imageClayShadow } as any]}>
+        <View style={styles.imageWrapLandscape}>
+          <Image source={{ uri }} style={styles.imageLandscape} resizeMode="cover" />
+        </View>
+      </View>
+      <View style={styles.sidebarWrapLandscape}>
+        <View style={styles.sidebarInner}>{readyCard}</View>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The peek control, overlaid on the hidden (blurred) image during a Stage 2
+ * session. Offers a single free peek; once used it shows a spent-state hint
+ * rather than another peek (01_recall_session.md §4). While peeking, the image
+ * is un-blurred (handled by the parent) and this shows a countdown — the reveal
+ * is timed and auto-ends, so it can't be held open.
+ */
+function PeekOverlay({
+  peeking,
+  peekUsed,
+  peekLeft,
+  onPeek,
+}: {
+  peeking: boolean;
+  peekUsed: boolean;
+  peekLeft: number;
+  onPeek: () => void;
+}) {
+  if (peeking) {
+    return (
+      <View style={peekStyles.pill}>
+        <Text style={peekStyles.pillText}>Peeking… {peekLeft}</Text>
+      </View>
+    );
+  }
+  if (peekUsed) {
+    return (
+      <View style={[peekStyles.pill, peekStyles.pillSpent]}>
+        <Text style={[peekStyles.pillText, peekStyles.pillTextSpent]}>Peek used</Text>
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      onPress={onPeek}
+      accessibilityRole="button"
+      accessibilityLabel="Peek at the picture once"
+      style={peekStyles.pill}
+    >
+      <Text style={peekStyles.pillText}>👀 Peek once</Text>
+    </Pressable>
+  );
+}
+
+const gateStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.yellowCard,
+    borderRadius: 30,
+    padding: 24,
+    gap: 16,
+    alignItems: "center",
+    alignSelf: "stretch",
+    width: "100%",
+    boxShadow:
+      "18px 18px 55px rgba(150,120,0,0.24), inset -12px -12px 34px rgba(251,222,40,0.7)" as any,
+  },
+  title: {
+    fontFamily: fonts.fredoka,
+    fontSize: 30,
+    color: colors.darkBlue,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontFamily: fonts.body,
+    fontSize: 16,
+    lineHeight: 23,
+    color: colors.darkBlue,
+    textAlign: "center",
+  },
+  readyBtn: {
+    backgroundColor: colors.pinkCard,
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    width: "80%",
+    alignItems: "center",
+  },
+  readyText: {
+    fontFamily: fonts.fredoka,
+    fontSize: 26,
+    color: colors.darkBlue,
+  },
+});
+
+const peekStyles = StyleSheet.create({
+  pill: {
+    position: "absolute",
+    bottom: 14,
+    alignSelf: "center",
+    backgroundColor: colors.white,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    boxShadow: "8px 8px 20px rgba(0,0,0,0.18)" as any,
+  },
+  pillSpent: {
+    backgroundColor: "rgba(255,255,255,0.6)",
+  },
+  pillText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
+    color: colors.darkBlue,
+  },
+  pillTextSpent: {
+    color: "#9297A0",
+  },
+});
 
 /* ═══════════════════════════════════════════════════════════════
    Question Card
@@ -380,13 +701,32 @@ function QuestionCard({
   const micRef = useRef<View>(null);
   const [micPressed, setMicPressed] = useState(false);
 
+  // Pulsing "radar" halo behind the mic while recording, so it's obvious the app
+  // is listening. Loops an expanding, fading ring; stops + resets when not recording.
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isRecording) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isRecording]);
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.85] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] });
+
   if (!question) return null;
 
   const label = isProcessing
-    ? processingStep === "transcribing" ? "Working on it!"
-    : processingStep === "evaluating"  ? "Working on it!"
-    : processingStep === "speaking"    ? "Adio says:"
-    : "Processing…"
+    ? "Working on it!"
     : isRecording
     ? "Tap to stop"
     : "Tap to speak";
@@ -408,8 +748,11 @@ function QuestionCard({
 
   // Inner yellow card — same recipe, scaled for the smaller surface.
   // Hue-shifted toward a brighter, more vivid orange instead of a muddy brown.
-  const yellowClayShadow =
-    "10px 10px 34px rgba(140,60,0,0.27), inset -9px -9px 28px rgba(255,150,20,0.75)";
+  // Presses in on tap (same clay-button feel as the Adult-tab rows): the outer
+  // drop shrinks and the inset deepens while held.
+  const yellowClayShadow = micPressed
+    ? "5px 5px 18px rgba(140,60,0,0.25), inset -5px -5px 16px rgba(255,150,20,0.8)"
+    : "10px 10px 34px rgba(140,60,0,0.27), inset -9px -9px 28px rgba(255,150,20,0.75)";
 
   const clayTransition = Platform.OS === "web"
     ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
@@ -422,7 +765,14 @@ function QuestionCard({
           <Text style={qStyles.questionText}>{question.text}</Text>
         </View>
         <View
-          style={[qStyles.yellowInner, { boxShadow: yellowClayShadow } as any, clayTransition]}
+          style={[
+            qStyles.yellowInner,
+            {
+              boxShadow: yellowClayShadow,
+              transform: [{ translateY: micPressed ? 3 : 0 }],
+            } as any,
+            clayTransition,
+          ]}
         >
           <Pressable
             onPress={onToggle}
@@ -433,13 +783,18 @@ function QuestionCard({
           >
             <View
               ref={micRef}
-              style={[
-                qStyles.micWrap,
-                { transform: [{ translateY: micPressed ? 2 : 0 }] },
-                clayTransition,
-              ]}
+              style={[qStyles.micWrap, clayTransition]}
               onLayout={handleMicLayout}
             >
+              {isRecording && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    qStyles.micRing,
+                    { transform: [{ scale: ringScale }], opacity: ringOpacity } as any,
+                  ]}
+                />
+              )}
               {isProcessing ? (
                 <Image
                   source={require("../../assets/spinner.gif")}
@@ -457,12 +812,6 @@ function QuestionCard({
           </Pressable>
           <View style={qStyles.micTextCol}>
             {!!label && <Text style={qStyles.micLabel}>{label}</Text>}
-            {!!heardText && processingStep !== "speaking" && (
-              <Text style={qStyles.heardText}>"{heardText}"</Text>
-            )}
-            {!!adioComment && processingStep === "speaking" && (
-              <Text style={qStyles.adioText}>{adioComment}</Text>
-            )}
           </View>
         </View>
       </View>
@@ -516,6 +865,13 @@ const qStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
+  },
+  micRing: {
+    position: "absolute",
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "rgba(247,29,115,0.45)",
   },
   micImage: {
     width: 100,
@@ -593,16 +949,16 @@ const fStyles = StyleSheet.create({
   },
   heading: {
     fontFamily: fonts.fredoka,
-    fontSize: 36,
+    fontSize: 26,
     color: colors.darkBlueText,
     marginBottom: 8,
   },
   comment: {
     fontFamily: fonts.body,
-    fontSize: 18,
+    fontSize: 15,
     color: colors.darkBlueText,
     textAlign: "center",
-    lineHeight: 25,
+    lineHeight: 21,
     marginVertical: 14,
     width: "100%",
     alignSelf: "stretch",
@@ -643,6 +999,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     position: "relative" as const,
     overflow: "visible" as const,
+    zIndex: 10,
+    backgroundColor: colors.bg,
   },
   logo: {
     height: 150,

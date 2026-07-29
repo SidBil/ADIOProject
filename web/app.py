@@ -36,7 +36,17 @@ from services.llm_service import LLMService
 from services.session_manager import SessionManager, IMAGE_DIR
 from services import interaction_store
 
+# Accuracy (0-5) at/above which an answer is "good enough" to advance without a
+# scaffolded follow-up. Stage 1 (image visible) uses the standard bar; Stage 2
+# (recall — image hidden) uses a gentler bar by one point, since recall is a
+# harder condition and shouldn't read to the child as failing at the underlying
+# skill (V&V Stage 2 PRD `01_recall_session.md` §5). Same rubric, lower trigger.
 ACCURACY_THRESHOLD = 4
+STAGE2_ACCURACY_THRESHOLD = 3
+
+
+def _followup_threshold(mode: str) -> int:
+    return STAGE2_ACCURACY_THRESHOLD if mode == "stage2" else ACCURACY_THRESHOLD
 
 # ---------------------------------------------------------------------------
 # Globals
@@ -69,6 +79,8 @@ class EvaluateRequest(BaseModel):
     session_id: str
     transcription: str
     initiation_latency_ms: float | None = None
+    # Total time to answer: question shown -> answer submitted (recording stopped).
+    answer_duration_ms: float | None = None
 
 class TTSRequest(BaseModel):
     text: str
@@ -101,21 +113,28 @@ async def serve_image(filename: str):
 @app.post("/api/session/start")
 async def start_session(req: StartRequest, token: str = Depends(get_token)):
     user_id = interaction_store.verify_token_and_get_user(token)
-    
+
+    # The trail decides this session's V&V mode from the child's durable
+    # completed-session count (every 3rd node is stage2 — Home path PRD §5/§6).
+    # Read the count in parallel with the Modal warmup so mode selection adds no
+    # latency to the warmup-blocking path.
+    home_state, _ = await asyncio.gather(
+        asyncio.to_thread(interaction_store.fetch_home_state, token, user_id),
+        asyncio.to_thread(asr.warmup),
+    )
+    completed_count = home_state.get("completed_count", 0)
+    mode = "stage2" if (completed_count + 1) % 3 == 0 else "stage1"
+
     try:
-        session = sessions.create_session()
+        session = sessions.create_session(mode=mode)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    # Run DB insert and Modal container warmup in parallel.
-    # Session start blocks until both finish — the warmup ensures the container
-    # is loaded before the user records their first answer.
-    db_id, _ = await asyncio.gather(
-        asyncio.to_thread(
-            interaction_store.create_therapy_session,
-            token, user_id, session.session_id, session.image_id, session.image_filename,
-        ),
-        asyncio.to_thread(asr.warmup),
+    # Persist the session row (with mode). Warmup already completed above, so the
+    # container is loaded before the user records their first answer.
+    db_id = await asyncio.to_thread(
+        interaction_store.create_therapy_session,
+        token, user_id, session.session_id, session.image_id, session.image_filename, mode,
     )
     session.internal_db_id = db_id
 
@@ -124,6 +143,7 @@ async def start_session(req: StartRequest, token: str = Depends(get_token)):
         "session_id": session.session_id,
         "image_id": session.image_id,
         "image_url": f"/images/{session.image_filename}",
+        "mode": session.mode,
         "question": {
             "id": q.id,
             "text": q.question,
@@ -133,6 +153,17 @@ async def start_session(req: StartRequest, token: str = Depends(get_token)):
         "total_questions": len(session.questions),
         "progress": session.progress,
     }
+
+
+@app.get("/api/home/state")
+async def home_state(token: str = Depends(get_token)):
+    """Durable Home-path state (completed-session count + streak) for the trail.
+
+    Read straight from Supabase, not in-memory session state, so Home renders
+    correctly on a cold-started serverless instance (Home path PRD §6).
+    """
+    user_id = interaction_store.verify_token_and_get_user(token)
+    return interaction_store.fetch_home_state(token, user_id)
 
 
 @app.get("/api/session/{session_id}")
@@ -254,6 +285,7 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
             structure_word=q.structure_word,
             entities=meta.entities,
             actions=meta.actions,
+            mode=session.mode,
         )
     except Exception:
         traceback.print_exc()
@@ -262,7 +294,12 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
     accuracy = evaluation.get("scores", {}).get("accuracy", 5)
     followup = None
 
-    if accuracy < ACCURACY_THRESHOLD:
+    # Stage 2 (recall): cap scaffolding at ONE gentle memory jog per question.
+    # Never follow up on an already-dynamic retry, so a forgotten detail can't
+    # spiral into repeated pushing — the child gets one nudge, then we release.
+    below_threshold = accuracy < _followup_threshold(session.mode)
+    recall_retry = session.mode == "stage2" and q.is_dynamic
+    if below_threshold and not recall_retry:
         try:
             followup = llm.generate_followup(
                 question=q.question,
@@ -271,6 +308,7 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
                 structure_word=q.structure_word,
                 entities=meta.entities,
                 actions=meta.actions,
+                mode=session.mode,
             )
         except Exception:
             traceback.print_exc()
@@ -281,13 +319,21 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
         evaluation,
         followup,
         initiation_latency_ms=req.initiation_latency_ms,
+        answer_duration_ms=req.answer_duration_ms,
     )
 
     if session.internal_db_id and q.internal_db_id:
         interaction_store.update_therapy_turn_evaluation(
-            token, q.internal_db_id, evaluation, 
-            followup if isinstance(followup, dict) else {}, 
+            token, q.internal_db_id, evaluation,
+            followup if isinstance(followup, dict) else {},
             None # LLM latency
+        )
+        # Best-effort, separate write so a pre-migration schema still keeps the
+        # evaluation above. Persists the frontend-captured turn timing.
+        interaction_store.update_therapy_turn_timing(
+            token, q.internal_db_id,
+            initiation_latency_ms=req.initiation_latency_ms,
+            answer_duration_ms=req.answer_duration_ms,
         )
 
     comment = ""
@@ -312,7 +358,9 @@ async def evaluate(req: EvaluateRequest, token: str = Depends(get_token)):
 
 
 # ---------------------------------------------------------------------------
-# End session early
+# Finalize session — called on both natural completion and early quit.
+# Completion status reflects whether all questions were actually answered, so
+# the clinical view can distinguish completed vs abandoned (PRD §4.4).
 # ---------------------------------------------------------------------------
 
 @app.post("/api/session/{session_id}/end")
@@ -321,8 +369,11 @@ async def end_session(session_id: str, token: str = Depends(get_token)):
     session = sessions.get_session(session_id) or sessions.recover_session(session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
-    session.completed = True
-    
+    # A session is "completed" only if every question (and follow-up) resolved.
+    # An early quit leaves this False — do NOT force it True.
+    completed = session.current_question_idx >= len(session.questions)
+    session.completed = completed
+
     if session.internal_db_id:
         scores = session.compute_scores()
         # Ensure we compute engagement for completion
@@ -336,15 +387,15 @@ async def end_session(session_id: str, token: str = Depends(get_token)):
                      scores["engagement"] = 1.0
                      
         interaction_store.complete_therapy_session(
-            token, session.internal_db_id, len(session.questions), 
-            session.progress["answered"], scores
+            token, session.internal_db_id, len(session.questions),
+            session.progress["answered"], scores, completed=completed
         )
-        
-    return {"status": "ended"}
+
+    return {"status": "ended", "completed": completed}
 
 
 # ---------------------------------------------------------------------------
-# Summary
+# Engagement baseline (aggregate score written to therapy_sessions on end)
 # ---------------------------------------------------------------------------
 
 ENGAGEMENT_BASELINE_N = 5      # how many past sessions to average for baseline
@@ -379,70 +430,70 @@ def _fetch_past_latencies(user_id: str, token: str) -> list[float]:
         return []
 
 
-def _count_past_sessions(user_id: str, token: str) -> int:
-    """Count how many past sessions exist for this user."""
-    sb_url = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "").rstrip("/")
-    sb_key = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
-    if not sb_url or not sb_key:
-        return 0
+# ---------------------------------------------------------------------------
+# Session Summary feature — child celebration + parent/SLP clinical views
+# ---------------------------------------------------------------------------
 
-    url = (
-        f"{sb_url}/rest/v1/therapy_sessions"
-        f"?user_id=eq.{user_id}"
-        f"&select=id"
-        f"&limit=100"
-    )
-    req = urllib.request.Request(url, headers={
-        "apikey": sb_key,
-        "Authorization": f"Bearer {token}",
-        "Prefer": "count=exact",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            cr = resp.headers.get("content-range", "")
-            if "/" in cr:
-                total = cr.split("/")[-1]
-                return int(total) if total != "*" else 0
-            rows = json_module.loads(resp.read().decode())
-            return len(rows)
-    except Exception:
-        traceback.print_exc()
-        return 0
+# Aggregate accuracy (0-5) at/above which a completed session earns the single
+# additive "bonus flourish" on the child's celebration screen. Upward-only:
+# below this the child sees the exact same warm base screen, never a lesser one.
+FLOURISH_ACCURACY_THRESHOLD = 1.0  # temporarily lowered so the flourish always shows
 
 
-@app.get("/api/session/{session_id}/summary")
-async def session_summary(session_id: str, token: str = Depends(get_token)):
-    user_id = interaction_store.verify_token_and_get_user(token)
+def _mean_accuracy(session) -> float | None:
+    """Average accuracy (0-5) across a session's answered turns, or None."""
+    vals = []
+    for q in session.questions:
+        ev = q.evaluation or {}
+        acc = ev.get("scores", {}).get("accuracy")
+        if acc is not None:
+            vals.append(acc)
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
+@app.get("/api/session/{session_id}/celebration")
+async def session_celebration(session_id: str, token: str = Depends(get_token)):
+    """Child celebration payload. Deliberately minimal: only a completion signal
+    and a single boolean deciding whether the additive flourish is shown. No
+    accuracy number ever crosses this boundary — see PRD 01_session_summary §3.4.
+    """
+    interaction_store.verify_token_and_get_user(token)
     session = sessions.get_session(session_id) or sessions.recover_session(session_id, token)
     if not session:
         raise HTTPException(404, "Session not found")
 
-    result = session.summary()
-    scores = result.get("scores", {})
+    mean_acc = _mean_accuracy(session)
+    flourish = mean_acc is not None and mean_acc >= FLOURISH_ACCURACY_THRESHOLD
 
-    # --- Compute Engagement from cross-session baseline ---
-    if user_id and scores.get("avg_latency_ms") is not None:
-        past_latencies = _fetch_past_latencies(user_id, token)
-        past_count = _count_past_sessions(user_id, token)
+    durations = [q.answer_duration_ms for q in session.questions
+                 if q.answer_duration_ms is not None]
+    total_time_ms = sum(durations) if durations else None
 
-        if len(past_latencies) >= ENGAGEMENT_MIN_SESSIONS:
-            baseline = sum(past_latencies) / len(past_latencies)
-            if baseline > 0:
-                e = max(0.0, min(1.0, 1.0 - scores["avg_latency_ms"] / baseline))
-                scores["engagement"] = round(e, 3)
-            else:
-                scores["engagement"] = 1.0
-        else:
-            scores["engagement"] = None
+    return {
+        "completed": session.completed,
+        "flourish": bool(flourish),
+        "accuracy": round(mean_acc, 1) if mean_acc is not None else None,
+        "total_time_ms": total_time_ms,
+    }
 
-        scores["sessions_toward_baseline"] = past_count
-        scores["baseline_min_sessions"] = ENGAGEMENT_MIN_SESSIONS
-    else:
-        scores["sessions_toward_baseline"] = 0
-        scores["baseline_min_sessions"] = ENGAGEMENT_MIN_SESSIONS
 
-    result["scores"] = scores
-    return result
+@app.get("/api/dashboard/overview")
+async def dashboard_overview(token: str = Depends(get_token)):
+    """Parent/SLP dashboard: recent sessions + per-structure-word sparklines."""
+    user_id = interaction_store.verify_token_and_get_user(token)
+    return interaction_store.fetch_dashboard_overview(token, user_id, window=10)
+
+
+@app.get("/api/session/{session_id}/detail")
+async def session_detail(session_id: str, token: str = Depends(get_token)):
+    """Parent/SLP clinical detail for one session (per-structure-word breakdown)."""
+    interaction_store.verify_token_and_get_user(token)
+    detail = interaction_store.fetch_session_detail(token, session_id)
+    if not detail:
+        raise HTTPException(404, "Session not found")
+    return detail
 
 
 # ---------------------------------------------------------------------------

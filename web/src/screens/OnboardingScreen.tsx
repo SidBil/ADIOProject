@@ -4,13 +4,13 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
   Pressable,
 } from "react-native";
 import { colors, fonts } from "../theme";
+import Spinner from "../components/Spinner";
 import { supabase } from "../lib/supabase";
 
 
@@ -73,7 +73,7 @@ export default function OnboardingScreen({ onComplete, userId }: Props) {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
+        <View style={styles.content}>
           <Text style={styles.title}>Welcome to Adio</Text>
           <Text style={styles.subtitle}>Before we begin, please tell us a little bit about yourself and your child.</Text>
 
@@ -121,14 +121,7 @@ export default function OnboardingScreen({ onComplete, userId }: Props) {
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <View style={{ marginTop: 24, width: "100%" }}>
-              <Button3DInline
-                title="Continue"
-                onPress={handleSave}
-                loading={loading}
-                topColor={colors.blueCard}
-                bottomColor={colors.blueBorder}
-                textColor={colors.darkBlue}
-              />
+            <ClayButton title="Continue" onPress={handleSave} loading={loading} />
           </View>
         </View>
       </ScrollView>
@@ -147,20 +140,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  card: {
-    backgroundColor: colors.cardWhite,
-    borderRadius: 28,
-    padding: 36,
+  content: {
     width: "100%",
     maxWidth: 480,
     alignItems: "center",
-    borderWidth: 5,
-    borderColor: "#d8d8d8",
-    shadowColor: "#d8d8d8",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    paddingHorizontal: 8,
   },
   title: {
     fontFamily: fonts.heading,
@@ -234,56 +218,43 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
+  clayBtn: {
+    backgroundColor: colors.blueCard,
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    width: "100%",
+    alignItems: "center",
+  },
+  clayBtnText: {
+    fontFamily: fonts.fredoka,
+    fontSize: 22,
+    color: colors.darkBlue,
+  },
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   Button3D component to mimic the 3D card layout 
+   Claymorphic button — matches the app's clay design language
+   (outer drop shadow + a brighter inset sculpt, presses in on tap).
    ═══════════════════════════════════════════════════════════════ */
 
-import { Animated, Easing } from "react-native";
-import { useEffect, useRef } from "react";
-
-function Button3DInline({ 
-  title, 
-  onPress, 
-  topColor, 
-  bottomColor, 
-  textColor, 
+function ClayButton({
+  title,
+  onPress,
   loading,
 }: {
   title: string;
   onPress: (e: any) => void;
-  topColor: string;
-  bottomColor: string;
-  textColor: string;
   loading: boolean;
 }) {
   const [pressed, setPressed] = useState(false);
-  const pressAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(pressAnim, {
-      toValue: pressed ? 1 : 0,
-      duration: 150,
-      easing: Easing.inOut(Easing.sin),
-      useNativeDriver: false,
-    }).start();
-  }, [pressed]);
-
-  const webTransitionStyle = Platform.OS === "web" ? {
-    transition: "transform 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95), box-shadow 150ms cubic-bezier(0.445, 0.05, 0.55, 0.95)",
-    boxShadow: pressed
-      ? `0px 0px 0px ${bottomColor}`
-      : `0px 8px 0px ${bottomColor}`,
-    transform: pressed ? "translateY(8px)" : "translateY(0px)",
-  } as any : undefined;
-
-  const nativeAnimStyle = Platform.OS !== "web" ? {
-    transform: [{ translateY: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) }],
-    shadowOffset: { width: 0, height: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) as unknown as number },
-    shadowOpacity: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-    elevation: pressAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }),
-  } : undefined;
+  const clayShadow = pressed
+    ? "5px 5px 18px rgba(10,70,130,0.22), inset -5px -5px 16px rgba(50,180,240,0.8)"
+    : "10px 10px 34px rgba(10,70,130,0.27), inset -9px -9px 28px rgba(50,180,240,0.72)";
+  const clayTransition =
+    Platform.OS === "web"
+      ? ({ transition: "box-shadow 180ms ease, transform 180ms ease" } as any)
+      : undefined;
 
   return (
     <Pressable
@@ -292,37 +263,17 @@ function Button3DInline({
       }}
       onPressIn={() => !loading && setPressed(true)}
       onPressOut={() => setPressed(false)}
-      style={{ width: "100%", marginTop: 4, marginBottom: 4 }}
+      style={[
+        styles.clayBtn,
+        { boxShadow: clayShadow, transform: [{ translateY: pressed ? 3 : 0 }] } as any,
+        clayTransition,
+      ]}
     >
-      <Animated.View
-        style={[
-          {
-            backgroundColor: topColor,
-            borderWidth: 4,
-            borderColor: bottomColor,
-            borderRadius: 999,
-            paddingVertical: 16,
-            alignItems: "center",
-            shadowColor: bottomColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 1,
-            shadowRadius: 0,
-          },
-          Platform.OS === "web" 
-            ? { shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, elevation: 0 } 
-            : undefined,
-          nativeAnimStyle,
-          webTransitionStyle,
-        ]}
-      >
-        {loading ? (
-          <ActivityIndicator color={textColor} />
-        ) : (
-          <Text style={{ fontFamily: fonts.heading, fontSize: 20, color: textColor }}>
-            {title}
-          </Text>
-        )}
-      </Animated.View>
+      {loading ? (
+        <Spinner size="small" />
+      ) : (
+        <Text style={styles.clayBtnText}>{title}</Text>
+      )}
     </Pressable>
   );
 }

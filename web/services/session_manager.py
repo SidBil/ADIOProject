@@ -21,6 +21,17 @@ STRUCTURE_WORDS = [
     "sound", "size", "number", "movement", "mood",
 ]
 
+# Full concrete -> abstract ordering of structure words. A session's fixed
+# question contract is the first QUESTIONS_PER_SESSION of these — this is the
+# single source of truth consumed by both the session loop (_build_questions)
+# and the parent/SLP clinical views (interaction_store detail + sparklines).
+SESSION_QUESTION_ORDER = [
+    "who", "what", "where", "color", "size",
+    "number", "shape", "sound", "movement", "mood",
+]
+QUESTIONS_PER_SESSION = 6
+SESSION_STRUCTURE_WORDS = SESSION_QUESTION_ORDER[:QUESTIONS_PER_SESSION]
+
 
 @dataclass
 class QuestionState:
@@ -34,6 +45,8 @@ class QuestionState:
     evaluation: dict | None = None
     followup: str | None = None
     initiation_latency_ms: float | None = None
+    # Total time to answer: question shown -> answer submitted (recording stopped).
+    answer_duration_ms: float | None = None
     internal_db_id: str | None = None
 
 
@@ -58,6 +71,9 @@ class Session:
     current_question_idx: int = 0
     completed: bool = False
     internal_db_id: str | None = None
+    # V&V condition for this session, decided by the trail before build:
+    # "stage1" (image visible) or "stage2" (recall). See the Home session-path PRD.
+    mode: str = "stage1"
 
     @property
     def current_question(self) -> QuestionState | None:
@@ -85,6 +101,7 @@ class Session:
                 "evaluation": q.evaluation,
                 "followup": q.followup,
                 "initiation_latency_ms": q.initiation_latency_ms,
+                "answer_duration_ms": q.answer_duration_ms,
             })
 
         scores = self.compute_scores()
@@ -198,8 +215,7 @@ def _load_metadata() -> dict[str, ImageMetadata]:
 
 def _build_questions(meta: ImageMetadata) -> list[QuestionState]:
     """Build a question queue from metadata, ordered concrete -> abstract."""
-    ordering = ["who", "what", "where", "color", "size",
-                "number", "shape", "sound", "movement", "mood"]
+    ordering = SESSION_STRUCTURE_WORDS
     difficulty_map = {
         "who": 1, "what": 1, "where": 1,
         "color": 1, "size": 1, "number": 1,
@@ -231,7 +247,7 @@ class SessionManager:
         self.available_images = sorted(self.image_metadata.keys())
         print(f"[Session] {len(self.available_images)} images with metadata loaded")
 
-    def create_session(self) -> Session:
+    def create_session(self, mode: str = "stage1") -> Session:
         sid = str(uuid.uuid4())[:8]
 
         if not self.available_images:
@@ -247,6 +263,7 @@ class SessionManager:
             image_filename=chosen,
             metadata=meta,
             questions=questions,
+            mode=mode,
         )
         self.sessions[sid] = session
         return session
@@ -266,7 +283,7 @@ class SessionManager:
 
             # 1. Look up the therapy_sessions row by app_session_id
             ts = sb.table("therapy_sessions") \
-                   .select("id, image_id, image_filename") \
+                   .select("id, image_id, image_filename, mode") \
                    .eq("app_session_id", session_id) \
                    .maybe_single() \
                    .execute()
@@ -284,12 +301,22 @@ class SessionManager:
             # 2. Rebuild the base question list from metadata
             all_questions = _build_questions(meta)
 
-            # 3. Load answered turns so we can replay state
-            turns_res = sb.table("therapy_turns") \
-                          .select("turn_index, question_text, transcription, llm_evaluation, llm_followup, initiation_latency_ms, structure_word") \
-                          .eq("session_id", row["id"]) \
-                          .order("turn_index") \
-                          .execute()
+            # 3. Load answered turns so we can replay state. answer_duration_ms is
+            # added by migration 003; fall back without it if the column is absent
+            # so recovery still works on an un-migrated DB.
+            _base = "turn_index, question_text, transcription, llm_evaluation, llm_followup, initiation_latency_ms, structure_word"
+
+            def _load(cols):
+                return sb.table("therapy_turns") \
+                    .select(cols) \
+                    .eq("session_id", row["id"]) \
+                    .order("turn_index") \
+                    .execute()
+
+            try:
+                turns_res = _load(_base + ", answer_duration_ms")
+            except Exception:
+                turns_res = _load(_base)
 
             turns = turns_res.data or []
             answered_count = len(turns)
@@ -303,6 +330,7 @@ class SessionManager:
                     followup = t.get("llm_followup") or {}
                     q.followup = followup.get("comment", "") if isinstance(followup, dict) else ""
                     q.initiation_latency_ms = t.get("initiation_latency_ms")
+                    q.answer_duration_ms = t.get("answer_duration_ms")
 
             # 4. Reconstruct session
             session = Session(
@@ -313,6 +341,7 @@ class SessionManager:
                 questions=all_questions,
                 current_question_idx=answered_count,
                 internal_db_id=row["id"],
+                mode=row.get("mode") or "stage1",
             )
             if answered_count >= len(all_questions):
                 session.completed = True
@@ -327,7 +356,8 @@ class SessionManager:
 
     def record_answer(self, session_id: str, transcription: str,
                       evaluation: dict, followup: dict | None = None,
-                      initiation_latency_ms: float | None = None):
+                      initiation_latency_ms: float | None = None,
+                      answer_duration_ms: float | None = None):
         session = self.sessions[session_id]
         q = session.current_question
         if q is None:
@@ -336,6 +366,7 @@ class SessionManager:
         q.evaluation = evaluation
         q.followup = followup.get("comment", "") if isinstance(followup, dict) else (followup or "")
         q.initiation_latency_ms = initiation_latency_ms
+        q.answer_duration_ms = answer_duration_ms
         session.current_question_idx += 1
 
         if isinstance(followup, dict):

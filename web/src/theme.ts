@@ -28,8 +28,10 @@ export const colors = {
 } as const;
 
 export const fonts = {
-  heading: "LeagueSpartan_800ExtraBold",
-  headingRegular: "LeagueSpartan_400Regular",
+  // Headings now use Fredoka (was League Spartan). Bold weight for the heavy
+  // heading token, regular for the lighter one.
+  heading: "Fredoka_700Bold",
+  headingRegular: "Fredoka_400Regular",
   body: "Inter_400Regular",
   bodyMedium: "Inter_500Medium",
   bodySemiBold: "Inter_600SemiBold",
